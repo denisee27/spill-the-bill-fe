@@ -1,10 +1,18 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Play } from 'lucide-react';
 import { imageUrl, formatCurrency } from '../../../shared/utils/format';
 import { ProductBadge } from './ProductBadge';
+import { ConditionBadge } from '../../../shared/components/ConditionBadge';
+import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 
-export function ProductCard({ product, onAddToCart }) {
-  const firstImage = product?.images?.[0]?.url || product?.images?.[0] || null;
+const isVideoUrl = (url) => /\.(mp4|mov|webm|avi)(\?.*)?$/i.test(url);
+
+export function ProductCard({ product, onAddToCart, onRequireAuth }) {
+  const allImages = product?.images || [];
+  const rawFirstImage = allImages[0]?.url || allImages[0] || null;
+  const firstImageSrc = rawFirstImage ? imageUrl(rawFirstImage) : null;
+  const firstIsVideo = firstImageSrc ? isVideoUrl(firstImageSrc) : false;
+  const firstImage = rawFirstImage;
   const soldOut = product.isSoldOut === true || product.stock === 0;
   const displayPrice = product.displayPrice ?? product.price;
   const hasDiscount = product.originalPrice && product.originalPrice > displayPrice;
@@ -24,14 +32,21 @@ export function ProductCard({ product, onAddToCart }) {
       className={`group bg-white rounded-2xl shadow-sm border border-dark-200 overflow-hidden hover:shadow-md hover:border-brand-300 transition-all duration-200 active:scale-[0.98] ${soldOut ? 'opacity-70' : ''}`}
     >
       {/* Image */}
-      <div className="relative aspect-[3/4] bg-dark-100 overflow-hidden">
+      <div className="relative aspect-[3/4] bg-white overflow-hidden">
         {firstImage ? (
-          <img
-            src={imageUrl(firstImage)}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
+          <>
+            <img
+              src={firstImageSrc}
+              alt={product.name}
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+            {firstIsVideo && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <Play size={32} className="text-white drop-shadow" />
+              </div>
+            )}
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-dark-300">
             <span className="text-4xl">?</span>
@@ -39,16 +54,23 @@ export function ProductCard({ product, onAddToCart }) {
         )}
 
         {/* Type badge — top left */}
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
           <ProductBadge type={product.type} />
+          {hasDiscount && !soldOut && (
+            <span className="self-start bg-brand-700 text-white text-xs font-black px-2 py-0.5 rounded-full">
+              -{discountPct}%
+            </span>
+          )}
         </div>
 
-        {/* Discount badge — top right */}
-        {hasDiscount && !soldOut && (
-          <div className="absolute top-2 right-2 bg-brand-700 text-white text-xs font-black px-2 py-0.5 rounded-full">
-            -{discountPct}%
-          </div>
-        )}
+        {/* Favorite button — top right */}
+        <div className="absolute top-2 right-2">
+          <FavoriteButton
+            productId={product.id}
+            onRequireAuth={onRequireAuth}
+            size="sm"
+          />
+        </div>
 
         {/* Hover CTA bar — slides up from bottom */}
         {!soldOut && (
@@ -96,6 +118,12 @@ export function ProductCard({ product, onAddToCart }) {
             )}
           </>
         )}
+        <div className="flex items-center justify-between mt-2">
+          <ConditionBadge condition={product.condition} />
+          {!soldOut && product.stock > 0 && product.stock <= 5 && (
+            <span className="text-xs text-orange-600 font-semibold">Only {product.stock} left!</span>
+          )}
+        </div>
       </div>
     </Link>
   );

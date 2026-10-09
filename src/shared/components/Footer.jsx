@@ -4,8 +4,10 @@ import { WHATSAPP_DEFAULT_NUMBER } from '../constants';
 
 export function Footer() {
   const { data: waSetting } = useWhatsappSetting();
-  const phoneNumber = waSetting?.phoneNumber || WHATSAPP_DEFAULT_NUMBER;
-  const waUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent('Hi! I want to ask about your products.')}`;
+  const phoneRaw = waSetting?.phoneNumber || WHATSAPP_DEFAULT_NUMBER;
+  const phone = phoneRaw.replace(/[^0-9]/g, '');
+  const message = waSetting?.defaultMessage || 'Halo, saya ingin menanyakan tentang produk Spill the Bill.';
+  const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   return (
     <footer className="bg-white border-t border-dark-100 mt-auto">

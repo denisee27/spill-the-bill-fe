@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ShoppingCart, MessageCircle, Minus, Plus, Zap } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, MessageCircle, Minus, Plus, Zap, Play } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useProduct } from '../features/products/hooks/useProduct';
 import { ProductBadge } from '../features/products/components/ProductBadge';
+import { ConditionBadge } from '../shared/components/ConditionBadge';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { LoginModal } from '../features/auth/components/LoginModal';
 import { useCart } from '../features/cart/hooks/useCart';
@@ -16,6 +17,11 @@ import { formatCurrency, imageUrl } from '../shared/utils/format';
 import { WHATSAPP_DEFAULT_NUMBER } from '../shared/constants';
 import { useWhatsappSetting } from '../features/settings/hooks/useWhatsappSetting';
 import clsx from 'clsx';
+import { SEO } from '../shared/components/SEO';
+import { FavoriteButton } from '../features/favorites/components/FavoriteButton';
+import { ShareProductButtons } from '../shared/components/ShareProductButtons';
+import { ReviewSection } from '../features/reviews/components/ReviewSection';
+import api from '../shared/services/api';
 
 export function ProductDetailPage() {
   const { id } = useParams();
@@ -33,7 +39,7 @@ export function ProductDetailPage() {
   const product = data?.data || data?.product || data;
   const { data: waSetting } = useWhatsappSetting();
 
-  const { cartCount, addItem } = useCart({
+  const { cartCount, addItem, items: cartItems } = useCart({
     isAuthenticated,
     onRequireAuth: () => setLoginOpen(true),
   });
@@ -51,6 +57,11 @@ export function ProductDetailPage() {
 
   // Reset quantity when variant changes
   useEffect(() => { setQuantity(1); }, [selectedVariant]);
+
+  // Record view
+  useEffect(() => {
+    if (id) api.post(`/products/${id}/view`).catch(() => {});
+  }, [id]);
 
   const buyNowMutation = useMutation({
     mutationFn: addToCart,
@@ -127,6 +138,13 @@ export function ProductDetailPage() {
   const handleBuyNow = () => {
     if (!isAuthenticated) { setLoginOpen(true); return; }
     if (needsVariantSelection) { toast.error('Please select a variant first'); return; }
+    const alreadyInCart = cartItems.some(
+      (i) => i.productId === product.id && (i.variantId ?? null) === (selectedVariant?.id ?? null)
+    );
+    if (alreadyInCart) {
+      navigate('/checkout');
+      return;
+    }
     buyNowMutation.mutate({
       productId: product.id,
       variantId: selectedVariant?.id || undefined,
@@ -136,6 +154,12 @@ export function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-dark-50 animate-fade-up">
+      <SEO
+        title={product?.name}
+        description={product?.description?.replace(/<[^>]+>/g, '').slice(0, 160)}
+        image={product?.images?.[0]}
+        url={product ? `/products/${product.id}` : undefined}
+      />
       <Navbar user={user} cartCount={cartCount} onLoginClick={() => setLoginOpen(true)} onLogout={logout} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -149,32 +173,47 @@ export function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* ── Left: Images ── */}
           <div className="space-y-3">
-            <div className="aspect-square rounded-2xl overflow-hidden bg-dark-100 border border-dark-200">
-              {currentImage ? (
-                <img
-                  src={imageUrl(currentImage.url || currentImage)}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
+            <div className="aspect-square rounded-2xl overflow-hidden bg-white border border-dark-200 flex items-center justify-center">
+              {currentImage ? (() => {
+                const src = imageUrl(currentImage.url || currentImage);
+                const isVid = /\.(mp4|mov|webm|avi)(\?.*)?$/i.test(src);
+                return isVid ? (
+                  <video src={src} className="w-full h-full object-contain" controls playsInline preload="metadata" />
+                ) : (
+                  <img src={src} alt={product.name} className="w-full h-full object-contain p-2" />
+                );
+              })() : (
                 <div className="w-full h-full flex items-center justify-center text-dark-300 text-6xl">?</div>
               )}
             </div>
             {images.length > 1 && !variantImage && (
               <>
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {images.map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedImageIndex(i)}
-                      className={clsx(
-                        'flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors',
-                        i === selectedImageIndex ? 'border-brand-700' : 'border-dark-200 hover:border-dark-400'
-                      )}
-                    >
-                      <img src={imageUrl(img.url || img)} alt={`thumbnail ${i + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+                  {images.map((img, i) => {
+                    const src = imageUrl(img.url || img);
+                    const isVid = /\.(mp4|mov|webm|avi)(\?.*)?$/i.test(src);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedImageIndex(i)}
+                        className={clsx(
+                          'relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors bg-white',
+                          i === selectedImageIndex ? 'border-brand-700' : 'border-dark-200 hover:border-dark-400'
+                        )}
+                      >
+                        {isVid ? (
+                          <>
+                            <video src={src} className="w-full h-full object-cover" preload="metadata" muted />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <Play size={16} className="text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <img src={src} alt={`thumbnail ${i + 1}`} className="w-full h-full object-contain p-1" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="flex justify-center gap-1.5">
                   {images.map((_, i) => (
@@ -195,13 +234,14 @@ export function ProductDetailPage() {
           {/* ── Right: Info ── */}
           <div className="space-y-5">
             {/* Badges */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <ProductBadge type={product.type} />
               {product.category && (
                 <span className="px-2 py-0.5 bg-dark-100 text-dark-600 text-xs rounded-full font-medium">
                   {product.category.name}
                 </span>
               )}
+              <ConditionBadge condition={product.condition} />
               {isSoldOut && (
                 <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-semibold">
                   Sold Out
@@ -222,7 +262,14 @@ export function ProductDetailPage() {
             )}
 
             {/* Name */}
-            <h1 className="text-3xl font-black text-dark-900 leading-tight">{product.name}</h1>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-3xl font-black text-dark-900 leading-tight">{product.name}</h1>
+              <FavoriteButton
+                productId={product.id}
+                isAuthenticated={isAuthenticated}
+                onRequireAuth={() => setLoginOpen(true)}
+              />
+            </div>
 
             {/* Price */}
             <div>
@@ -247,7 +294,10 @@ export function ProductDetailPage() {
 
             {/* Description */}
             {product.description && (
-              <p className="text-dark-600 leading-relaxed text-sm">{product.description}</p>
+              <div
+                className="prose prose-sm max-w-none text-dark-600"
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
             )}
 
             {/* Variants */}
@@ -357,9 +407,21 @@ export function ProductDetailPage() {
                 <MessageCircle size={16} />
                 Ask a Question
               </a>
+
+              {/* Share */}
+              <div className="pt-1">
+                <ShareProductButtons product={product} />
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Reviews */}
+        <ReviewSection
+          productId={product.id}
+          isAuthenticated={isAuthenticated}
+          onRequireAuth={() => setLoginOpen(true)}
+        />
       </div>
 
       {/* Sticky bar — mobile */}

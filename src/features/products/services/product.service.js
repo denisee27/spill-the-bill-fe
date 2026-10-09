@@ -9,6 +9,11 @@ export async function getProducts(params = {}) {
   return res.data;
 }
 
+export async function getAdminProducts(params = {}) {
+  const res = await api.get('/products/admin-list', { params });
+  return res.data;
+}
+
 /**
  * Fetch a single product by ID
  * @param {string} id
@@ -94,6 +99,11 @@ export async function updateProductStock(id, stock) {
 
 export async function bulkSoldOut(ids, soldOut = true) {
   const res = await api.patch('/products/bulk-soldout', { ids, soldOut });
+  return res.data;
+}
+
+export async function duplicateProduct(id) {
+  const res = await api.post(`/products/${id}/duplicate`);
   return res.data;
 }
 

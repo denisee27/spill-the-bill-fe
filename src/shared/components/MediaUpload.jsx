@@ -1,18 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Film, Plus, Camera, Image, Wand2, Loader2 } from 'lucide-react';
+import { X, Play, Plus, Camera, Image, Wand2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { removeBackground } from '@imgly/background-removal';
 import { imageUrl } from '../utils/format';
-
-const TEMPLATE_SRC = '/template.jpeg';
-
-// Product sits ON the podium. Podium top ≈ 63% from image top, centered horizontally.
-const PLACEMENT = {
-  maxWidthRatio: 0.48,   // product max width = 48% of template width
-  maxHeightRatio: 0.42,  // product max height = 42% of template height
-  bottomRatio: 0.655,    // product bottom edge lands at 65.5% from top (podium surface)
-  centerXRatio: 0.50,    // centered horizontally
-};
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -24,36 +14,41 @@ function loadImage(src) {
   });
 }
 
-async function compositeOnTemplate(productFile) {
-  const [template, bgRemovedBlob] = await Promise.all([
-    loadImage(TEMPLATE_SRC),
-    removeBackground(productFile, { output: { format: 'image/png' } }),
-  ]);
+function addCanvasWatermark(ctx, W, H) {
+  const fontSize = Math.max(14, Math.round(W * 0.04));
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(-Math.PI / 6);
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = 'rgba(180, 180, 180, 0.55)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('@spillthebill', 0, 0);
+  ctx.restore();
+}
+
+async function removeBackgroundToWhite(productFile) {
+  const bgRemovedBlob = await removeBackground(productFile, {
+    output: { format: 'image/png', type: 'foreground', quality: 1 },
+    model: 'medium',
+  });
 
   const product = await loadImage(URL.createObjectURL(bgRemovedBlob));
-
-  const W = template.naturalWidth;
-  const H = template.naturalHeight;
-
-  const maxPW = W * PLACEMENT.maxWidthRatio;
-  const maxPH = H * PLACEMENT.maxHeightRatio;
-  const scale = Math.min(maxPW / product.naturalWidth, maxPH / product.naturalHeight);
-
-  const pw = product.naturalWidth * scale;
-  const ph = product.naturalHeight * scale;
-  const px = W * PLACEMENT.centerXRatio - pw / 2;
-  const py = H * PLACEMENT.bottomRatio - ph;
+  const W = product.naturalWidth;
+  const H = product.naturalHeight;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(template, 0, 0, W, H);
-  ctx.drawImage(product, px, py, pw, ph);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(product, 0, 0, W, H);
+  addCanvasWatermark(ctx, W, H);
 
   return new Promise((resolve) => {
     canvas.toBlob(
-      (blob) => resolve(new File([blob], `templated-${productFile.name.replace(/\.[^.]+$/, '')}.jpeg`, { type: 'image/jpeg' })),
+      (blob) => resolve(new File([blob], `bg-removed-${productFile.name.replace(/\.[^.]+$/, '')}.jpeg`, { type: 'image/jpeg' })),
       'image/jpeg',
       0.93
     );
@@ -117,23 +112,23 @@ export function MediaUpload({ files = [], onChange }) {
     addFiles(e.dataTransfer.files);
   };
 
-  const handleApplyTemplate = async (i) => {
+  const handleRemoveBackground = async (i) => {
     const file = files[i];
     if (!(file instanceof File) || file.type.startsWith('video/')) {
-      toast.error('Template can only be applied to image files you just uploaded.');
+      toast.error('Only works on uploaded image files.');
       return;
     }
     setProcessing((p) => ({ ...p, [i]: true }));
-    const toastId = toast.loading('Removing background & applying template…');
+    const toastId = toast.loading('Removing background…');
     try {
-      const result = await compositeOnTemplate(file);
+      const result = await removeBackgroundToWhite(file);
       const next = [...files];
       next[i] = result;
       onChange(next);
-      toast.success('Template applied!', { id: toastId });
+      toast.success('Background removed!', { id: toastId });
     } catch (err) {
       console.error(err);
-      toast.error('Failed to process image. Try again.', { id: toastId });
+      toast.error('Failed to process image.', { id: toastId });
     } finally {
       setProcessing((p) => ({ ...p, [i]: false }));
     }
@@ -164,12 +159,13 @@ export function MediaUpload({ files = [], onChange }) {
                 className="relative w-24 h-24 rounded-xl overflow-hidden border border-dark-200 bg-dark-50 flex-shrink-0 group"
               >
                 {isVideo(file) ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-dark-400">
-                    <Film size={24} />
-                    <span className="text-xs px-1 truncate w-full text-center">
-                      {file instanceof File ? file.name.slice(0, 10) : 'Video'}
-                    </span>
-                  </div>
+                  <video
+                    src={getPreviewUrl(file)}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
                 ) : (
                   <img src={getPreviewUrl(file)} className="w-full h-full object-cover" alt="" />
                 )}
@@ -183,13 +179,13 @@ export function MediaUpload({ files = [], onChange }) {
                   <X size={11} />
                 </button>
 
-                {/* Apply template button — only for image Files */}
+                {/* Remove background button — only for image Files */}
                 {file instanceof File && !isVideo(file) && (
                   <button
                     type="button"
-                    onClick={() => handleApplyTemplate(i)}
+                    onClick={() => handleRemoveBackground(i)}
                     disabled={processing[i]}
-                    title="Remove background & apply template"
+                    title="Remove background"
                     className="absolute bottom-1 left-1 w-6 h-6 bg-brand-800 text-white rounded-full flex items-center justify-center hover:bg-brand-700 transition-colors z-10 disabled:opacity-60"
                   >
                     {processing[i]
@@ -252,7 +248,7 @@ export function MediaUpload({ files = [], onChange }) {
             </p>
             <p className="text-xs text-dark-400 flex items-center gap-1">
               <Wand2 size={11} className="text-brand-700 flex-shrink-0" />
-              Click the red wand on any uploaded image to remove background & apply brand template
+              Click the wand on any uploaded image to remove background (white bg + watermark)
             </p>
           </div>
         </>

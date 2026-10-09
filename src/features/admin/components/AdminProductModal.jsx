@@ -17,8 +17,9 @@ import Modal from '../../../shared/components/Modal';
 import Button from '../../../shared/components/Button';
 import Input from '../../../shared/components/Input';
 import { MediaUpload } from '../../../shared/components/MediaUpload';
+import { RichTextEditor } from '../../../shared/components/RichTextEditor';
 import LoadingSpinner from '../../../shared/components/LoadingSpinner';
-import { PRODUCT_TYPE } from '../../../shared/constants';
+import { useProductTypes } from '../../../shared/hooks/useProductTypes';
 import { imageUrl as buildImageUrl, formatCurrency } from '../../../shared/utils/format';
 import clsx from 'clsx';
 
@@ -162,6 +163,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     reset,
     control,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: { variants: [], originId: '', eventId: '' },
@@ -181,6 +183,8 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     queryFn: () => getProductAdmin(productId),
     enabled: isEdit && isOpen,
   });
+
+  const { types: productTypes } = useProductTypes({ includeInactive: true });
 
   const { data: catData } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
   const categories = catData?.data || catData?.categories || catData || [];
@@ -238,6 +242,8 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
         originalPrice: v.originalPrice || '',
         stock: v.stock ?? 0,
       })),
+      condition: p.condition || 'New',
+      status: p.status || 'ACTIVE',
       originId: p.originId || '',
       eventId: p.eventProducts?.[0]?.eventId || '',
     });
@@ -323,6 +329,8 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     fd.append('name', data.name);
     fd.append('type', data.type);
     fd.append('description', data.description || '');
+    if (data.condition) fd.append('condition', data.condition);
+    if (data.status) fd.append('status', data.status);
     if (data.categoryId) fd.append('categoryId', data.categoryId);
     if (data.originId) fd.append('originId', data.originId);
 
@@ -416,8 +424,9 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
                     {...register('type', { required: 'Type is required' })}
                   >
                     <option value="">Select type</option>
-                    <option value={PRODUCT_TYPE.JASTIP}>Jastip</option>
-                    <option value={PRODUCT_TYPE.PRELOVED}>Preloved</option>
+                    {productTypes.map((t) => (
+                      <option key={t.id} value={t.slug}>{t.name}</option>
+                    ))}
                   </select>
                   {errors.type && <p className="text-xs text-red-600 mt-1">{errors.type.message}</p>}
                 </div>
@@ -443,12 +452,33 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Condition</label>
+                <select
+                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
+                  {...register('condition')}
+                >
+                  <option value="New">New</option>
+                  <option value="Good">Good</option>
+                  <option value="Well Used">Well Used</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Status</label>
+                <select
+                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
+                  {...register('status')}
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">Description</label>
-                <textarea
-                  rows={4}
+                <RichTextEditor
+                  value={watch('description') || ''}
+                  onChange={(html) => setValue('description', html)}
                   placeholder="Product description..."
-                  className="w-full px-3 py-2 border border-dark-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 resize-none"
-                  {...register('description')}
                 />
               </div>
             </div>

@@ -14,17 +14,20 @@ import LoadingSpinner from '../shared/components/LoadingSpinner';
 import EmptyState from '../shared/components/EmptyState';
 import { useDebounce } from '../shared/hooks/useDebounce';
 import { TAB_VALUES } from '../shared/constants';
-import { CalendarDays } from 'lucide-react';
+import { useProductTypes } from '../shared/hooks/useProductTypes';
+import { CalendarDays, SlidersHorizontal } from 'lucide-react';
 import { Footer } from '../shared/components/Footer';
+import { FilterPanel } from '../shared/components/FilterPanel';
+import { SEO } from '../shared/components/SEO';
 import clsx from 'clsx';
 
-const TABS = [
-  { value: TAB_VALUES.ALL, label: 'All Products' },
-  { value: TAB_VALUES.JASTIP, label: 'Jastip' },
-  { value: TAB_VALUES.PRELOVED, label: 'Preloved' },
-];
-
 export function HomePage() {
+  const { types: productTypes } = useProductTypes();
+  const TABS = [
+    { value: TAB_VALUES.ALL, label: 'All Products' },
+    ...productTypes.map((t) => ({ value: t.slug, label: t.name })),
+  ];
+
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,15 +35,35 @@ export function HomePage() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [pendingProduct, setPendingProduct] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [priceRange, setPriceRange] = useState([0, 10000000]);
+  const [sortBy, setSortBy] = useState('');
+  const [inStock, setInStock] = useState(false);
+  const [condition, setCondition] = useState('');
+  const MAX_PRICE = 10000000;
 
   const tab = searchParams.get('tab') || TAB_VALUES.ALL;
   const debouncedSearch = useDebounce(search, 350);
   const isJastipTab = tab === TAB_VALUES.JASTIP;
 
+  const hasActiveFilters =
+    selectedCategories.length > 0 ||
+    priceRange[0] > 0 ||
+    priceRange[1] < MAX_PRICE ||
+    !!sortBy ||
+    inStock ||
+    !!condition;
+
   const filters = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(tab !== TAB_VALUES.ALL ? { type: tab.toUpperCase() } : {}),
-    ...(activeCategory ? { categoryId: activeCategory } : {}),
+    ...(selectedCategories.length > 0 ? { categoryIds: selectedCategories.join(',') } : activeCategory ? { categoryId: activeCategory } : {}),
+    ...(priceRange[0] > 0 ? { minPrice: priceRange[0] } : {}),
+    ...(priceRange[1] < MAX_PRICE ? { maxPrice: priceRange[1] } : {}),
+    ...(sortBy ? { sortBy } : {}),
+    ...(inStock ? { inStock: true } : {}),
+    ...(condition ? { condition } : {}),
   };
 
   const {
@@ -85,6 +108,11 @@ export function HomePage() {
     if (search && newTab !== TAB_VALUES.JASTIP) params.q = search;
     setSearchParams(params);
     setActiveCategory(null);
+    setSelectedCategories([]);
+    setPriceRange([0, MAX_PRICE]);
+    setSortBy('');
+    setInStock(false);
+    setCondition('');
   };
 
   const handleSearchChange = (val) => {
@@ -114,6 +142,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-dark-50 animate-fade-up">
+      <SEO title="Shop" url="/home" />
       <Navbar
         user={user}
         cartCount={cartCount}
@@ -175,36 +204,54 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Category pills — products tabs only */}
-        {!isJastipTab && categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 mb-4">
+        {/* Filter bar — products tabs only */}
+        {!isJastipTab && (
+          <div className="flex items-center gap-2 mb-4">
             <button
-              onClick={() => setActiveCategory(null)}
+              onClick={() => setFilterOpen(true)}
               className={clsx(
-                'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
-                activeCategory === null
+                'flex items-center gap-2 px-4 py-2 border rounded-xl text-sm font-medium transition-colors',
+                hasActiveFilters
                   ? 'bg-brand-800 text-white border-brand-800'
-                  : 'bg-white text-dark-600 border-dark-200 hover:border-dark-400'
+                  : 'bg-white text-dark-700 border-dark-200 hover:border-dark-400'
               )}
             >
-              All
+              <SlidersHorizontal size={14} />
+              Filter
+              {hasActiveFilters && (
+                <span className="w-2 h-2 bg-white rounded-full" />
+              )}
             </button>
-            {categories.map((cat) => (
+            {hasActiveFilters && (
               <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={clsx(
-                  'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
-                  activeCategory === cat.id
-                    ? 'bg-brand-800 text-white border-brand-800'
-                    : 'bg-white text-dark-600 border-dark-200 hover:border-dark-400'
-                )}
+                onClick={() => { setSelectedCategories([]); setPriceRange([0, MAX_PRICE]); setSortBy(''); setInStock(false); setCondition(''); }}
+                className="text-xs text-dark-500 hover:text-dark-800 underline"
               >
-                {cat.name}
+                Reset
               </button>
-            ))}
+            )}
           </div>
         )}
+
+        <FilterPanel
+          isOpen={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          categories={categories}
+          selectedCategories={selectedCategories}
+          priceRange={priceRange}
+          maxPrice={MAX_PRICE}
+          sortBy={sortBy}
+          inStock={inStock}
+          condition={condition}
+          onApply={({ categories: cats, priceRange: pr, sortBy: sb, inStock: is, condition: cond }) => {
+            setSelectedCategories(cats);
+            setPriceRange(pr);
+            setSortBy(sb);
+            setInStock(is);
+            setCondition(cond);
+          }}
+          onReset={() => { setSelectedCategories([]); setPriceRange([0, MAX_PRICE]); setSortBy(''); setInStock(false); setCondition(''); }}
+        />
 
         {/* Error state */}
         {error && (

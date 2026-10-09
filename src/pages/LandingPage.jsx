@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, MessageCircle, Star, Shield, Zap, Heart, ShoppingBag, CreditCard, PackageCheck } from 'lucide-react';
 import { WHATSAPP_DEFAULT_NUMBER } from '../shared/constants';
 import { useWhatsappSetting } from '../features/settings/hooks/useWhatsappSetting';
+import { SEO } from '../shared/components/SEO';
 
 function useScrollReveal() {
   const refs = useRef([]);
@@ -69,6 +70,7 @@ export function LandingPage() {
 
   return (
     <>
+      <SEO url="/" />
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }

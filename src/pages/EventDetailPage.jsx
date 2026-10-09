@@ -10,6 +10,7 @@ import { Navbar } from '../shared/components/Navbar';
 import { ProductGrid } from '../features/products/components/ProductGrid';
 import LoadingSpinner from '../shared/components/LoadingSpinner';
 import { imageUrl, formatDate } from '../shared/utils/format';
+import { SEO } from '../shared/components/SEO';
 
 function isLiveNow(startDate, endDate) {
   if (!startDate || !endDate) return false;
@@ -108,6 +109,12 @@ export function EventDetailPage() {
 
   return (
     <div className="min-h-screen bg-dark-50">
+      <SEO
+        title={event?.name}
+        description={event?.description?.replace(/<[^>]+>/g, '').slice(0, 160)}
+        image={event?.bannerImage}
+        url={event ? `/events/${event.id}` : undefined}
+      />
       <Navbar user={user} cartCount={cartCount} onLoginClick={() => setLoginOpen(true)} onLogout={logout} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

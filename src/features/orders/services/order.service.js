@@ -113,3 +113,9 @@ export async function validateVoucher(code) {
   const res = await api.get('/vouchers/validate', { params: { code } });
   return res.data;
 }
+
+// Shipping
+export async function getShippingCost({ originCity, destinationCity, weight }) {
+  const res = await api.post('/shipping/cost-by-name', { originCity, destinationCity, weight });
+  return res.data;
+}

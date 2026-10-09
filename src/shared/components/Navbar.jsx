@@ -1,15 +1,28 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Search, User, LogOut, Package, ChevronDown, X } from 'lucide-react';
 import clsx from 'clsx';
 import { LogoutConfirmModal } from './LogoutConfirmModal';
+import { SearchSuggestions } from './SearchSuggestions';
 
 export function Navbar({ user, cartCount = 0, onSearchChange, searchValue = '', onLoginClick, onLogout }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchContainerRef = useRef(null);
   const navigate = useNavigate();
   const hasSearch = typeof onSearchChange === 'function';
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
   const handleLogout = () => {
     setUserMenuOpen(false);
@@ -45,24 +58,32 @@ export function Navbar({ user, cartCount = 0, onSearchChange, searchValue = '', 
 
             {/* Desktop search — only when search is available */}
             {hasSearch && (
-              <div className="hidden sm:flex flex-1 max-w-sm relative">
+              <div ref={searchContainerRef} className="hidden sm:flex flex-1 max-w-sm relative">
                 <Search size={15} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
                 <input
                   type="search"
                   aria-label="Search products"
                   placeholder="Search products..."
                   value={searchValue}
-                  onChange={(e) => onSearchChange(e.target.value)}
+                  onChange={(e) => { onSearchChange(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setShowSuggestions(false); }}
                   className="w-full pl-9 pr-3 py-2 bg-dark-50 rounded-full text-sm border border-dark-200 focus:outline-none focus:ring-2 focus:ring-brand-700 focus:border-transparent focus:bg-white transition-all [&::-webkit-search-cancel-button]:hidden"
                 />
                 {searchValue && (
                   <button
-                    onClick={() => onSearchChange('')}
+                    onClick={() => { onSearchChange(''); setShowSuggestions(false); }}
                     aria-label="Clear search"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600"
                   >
                     <X size={13} />
                   </button>
+                )}
+                {showSuggestions && (
+                  <SearchSuggestions
+                    query={searchValue}
+                    onSelect={() => { onSearchChange(''); setShowSuggestions(false); }}
+                  />
                 )}
               </div>
             )}

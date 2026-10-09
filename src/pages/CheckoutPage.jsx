@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   CheckCircle, MapPin, Plus, QrCode, Upload,
-  ChevronRight, Package, Tag, Copy,
+  ChevronRight, Package, Tag, Copy, Clock, Truck,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCart } from '../features/cart/hooks/useCart';
@@ -14,6 +14,8 @@ import {
   createAddress,
   createOrder,
   uploadPaymentProof,
+  cancelOrder,
+  getShippingCost,
 } from '../features/orders/services/order.service';
 import { Navbar } from '../shared/components/Navbar';
 import Button from '../shared/components/Button';
@@ -21,6 +23,7 @@ import Input from '../shared/components/Input';
 import Modal from '../shared/components/Modal';
 import ImageUpload from '../shared/components/ImageUpload';
 import LoadingSpinner from '../shared/components/LoadingSpinner';
+import { WilayahSelect } from '../shared/components/WilayahSelect';
 import { formatCurrency } from '../shared/utils/format';
 import { imageUrl } from '../shared/utils/format';
 import { CHECKOUT_STEPS } from '../shared/constants';
@@ -45,6 +48,16 @@ export function CheckoutPage() {
   const [proofFiles, setProofFiles] = useState([]);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [addrRegion, setAddrRegion] = useState({ province: null, regency: null, district: null, village: null });
+
+  // Shipping state
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState(null);
+  const [selectedCourier, setSelectedCourier] = useState(null);
 
   const { items: cartItems, cartCount } = useCart({ isAuthenticated });
 
@@ -71,9 +84,10 @@ export function CheckoutPage() {
   const createAddressMutation = useMutation({
     mutationFn: createAddress,
     onSuccess: () => {
-      toast.success('Address saved!');
+      toast.success('Alamat berhasil disimpan!');
       setAddAddressOpen(false);
       reset();
+      setAddrRegion({ province: null, regency: null, district: null, village: null });
       refetchAddresses();
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to add address'),
@@ -85,6 +99,7 @@ export function CheckoutPage() {
       const order = data?.data || data?.order || data;
       setCreatedOrder(order);
       setStep(CHECKOUT_STEPS.PAYMENT);
+      setConfirmModalOpen(false);
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to create order'),
   });
@@ -102,15 +117,80 @@ export function CheckoutPage() {
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to upload proof'),
   });
 
+  // Fetch shipping cost whenever address changes
+  const fetchShipping = useCallback(async (addressId) => {
+    if (!addressId) return;
+
+    const addr = addresses.find((a) => a.id === addressId);
+    if (!addr?.city) return;
+
+    // Try to get origin city from any cart item's product origin
+    const originCity = selectedCartItems.reduce((found, item) => {
+      return found || item?.product?.origin?.city || null;
+    }, null);
+
+    setShippingLoading(true);
+    setShippingError(null);
+    setShippingOptions([]);
+    setSelectedCourier(null);
+
+    if (!originCity) {
+      setShippingLoading(false);
+      setShippingError('Origin city not configured on product(s). Set origin in the admin panel to enable shipping cost calculation.');
+      return;
+    }
+
+    try {
+      const res = await getShippingCost({ originCity, destinationCity: addr.city, weight: 1000 });
+      // RajaOngkir V2: flat array [{ name, code, service, description, cost, etd }]
+      const raw = res?.data ?? [];
+      const options = raw
+        .map((s) => ({
+          key: `${s.code}-${s.service}`,
+          courier: s.name,
+          service: s.service,
+          description: s.description,
+          cost: s.cost ?? 0,
+          etd: s.etd ?? '',
+        }))
+        .filter((o) => o.cost > 0);
+      setShippingOptions(options);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || '';
+      setShippingError(msg.includes('City not found')
+        ? `City not found in RajaOngkir database. Check the origin/destination city name.`
+        : 'Failed to load shipping options. Please try again.');
+    } finally {
+      setShippingLoading(false);
+    }
+  }, [addresses, selectedCartItems]);
+
+  const handleAddressSelect = (id) => {
+    setSelectedAddressId(id);
+    setSelectedCourier(null);
+    setShippingOptions([]);
+    fetchShipping(id);
+  };
+
   const handleAddressNext = () => {
     if (!selectedAddressId) {
       toast.error('Please select a delivery address');
       return;
     }
+    if (shippingOptions.length > 0 && !selectedCourier) {
+      toast.error('Please select a shipping courier');
+      return;
+    }
+    setConfirmModalOpen(true);
+  };
+
+  const handleConfirmOrder = () => {
     createOrderMutation.mutate({
       addressId: selectedAddressId,
       cartItemIds: itemIds,
       voucherCode: voucherCode || undefined,
+      shippingFee: selectedCourier?.cost ?? 0,
+      courierService: selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : undefined,
     });
   };
 
@@ -120,6 +200,32 @@ export function CheckoutPage() {
       return;
     }
     uploadProofMutation.mutate({ orderId: createdOrder?.id, files: proofFiles });
+  };
+
+  useEffect(() => {
+    if (!createdOrder || step !== CHECKOUT_STEPS.PAYMENT) return;
+    const expiryMs = createdOrder.expiresAt
+      ? new Date(createdOrder.expiresAt).getTime()
+      : new Date(createdOrder.createdAt).getTime() + 5 * 60 * 1000;
+
+    const interval = setInterval(() => {
+      const left = Math.max(0, expiryMs - Date.now());
+      setTimeLeft(left);
+      if (left === 0) navigate('/orders');
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [createdOrder, step, navigate]);
+
+  const handleCancelOrder = async () => {
+    try {
+      await cancelOrder(createdOrder.id);
+      toast.success('Order cancelled');
+      navigate('/orders');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel order');
+    } finally {
+      setCancelModalOpen(false);
+    }
   };
 
   const copyOrderId = () => {
@@ -137,7 +243,8 @@ export function CheckoutPage() {
     : summaryItems.reduce((s, i) => s + (i.product?.price || i.price || 0) * (i.quantity || 1), 0);
 
   const summaryDiscount = createdOrder?.discountAmount ?? 0;
-  const summaryTotal = createdOrder?.total ?? Math.max(0, summarySubtotal - summaryDiscount);
+  const summaryShipping = createdOrder?.shippingFee ?? (selectedCourier?.cost ?? 0);
+  const summaryTotal = createdOrder?.total ?? Math.max(0, summarySubtotal - summaryDiscount + summaryShipping);
 
   // ── Success screen ──
   if (submitted) {
@@ -250,94 +357,161 @@ export function CheckoutPage() {
 
             {/* ── Step 1: Address ── */}
             {step === CHECKOUT_STEPS.ADDRESS && (
-              <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-dark-100">
-                  <div className="flex items-center gap-2">
-                    <MapPin size={16} className="text-brand-700" />
-                    <h2 className="font-bold text-dark-900">Delivery Address</h2>
+              <div className="space-y-4">
+                {/* Address selector */}
+                <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-dark-100">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={16} className="text-brand-700" />
+                      <h2 className="font-bold text-dark-900">Delivery Address</h2>
+                    </div>
+                    <button
+                      onClick={() => setAddAddressOpen(true)}
+                      className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 transition-colors"
+                    >
+                      <Plus size={13} /> Add New
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setAddAddressOpen(true)}
-                    className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 transition-colors"
-                  >
-                    <Plus size={13} /> Add New
-                  </button>
-                </div>
 
-                <div className="p-5">
-                  {addressLoading ? (
-                    <div className="flex justify-center py-10">
-                      <LoadingSpinner />
-                    </div>
-                  ) : addresses.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <MapPin size={32} className="text-dark-300 mx-auto mb-3" />
-                      <p className="text-dark-600 font-medium mb-1">No saved addresses</p>
-                      <p className="text-dark-400 text-sm mb-4">Add a delivery address to continue</p>
-                      <Button variant="secondary" size="sm" onClick={() => setAddAddressOpen(true)}>
-                        <Plus size={14} /> Add Address
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {addresses.map((addr) => {
-                        const selected = selectedAddressId === addr.id;
-                        return (
-                          <button
-                            key={addr.id}
-                            onClick={() => setSelectedAddressId(addr.id)}
-                            className={clsx(
-                              'w-full text-left p-4 rounded-xl border-2 transition-all',
-                              selected
-                                ? 'border-brand-700 bg-brand-50 shadow-sm'
-                                : 'border-dark-200 hover:border-dark-300 hover:bg-dark-50'
-                            )}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={clsx(
-                                'w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center',
-                                selected ? 'border-brand-700' : 'border-dark-400'
-                              )}>
-                                {selected && <div className="w-2 h-2 rounded-full bg-brand-700" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-semibold text-sm text-dark-900">
-                                    {addr.label || 'Address'}
-                                  </span>
-                                  {addr.isDefault && (
-                                    <span className="text-xs bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
-                                      Default
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-dark-700 mt-0.5 font-medium">{addr.recipientName}</p>
-                                <p className="text-xs text-dark-500 mt-0.5">{addr.phone}</p>
-                                <p className="text-xs text-dark-400 mt-0.5">
-                                  {addr.street}, {addr.city}, {addr.province} {addr.postalCode}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full mt-5"
-                    onClick={handleAddressNext}
-                    disabled={!selectedAddressId || createOrderMutation.isPending}
-                  >
-                    {createOrderMutation.isPending ? (
-                      <span className="flex items-center gap-2"><LoadingSpinner size="sm" /> Creating order...</span>
+                  <div className="p-5">
+                    {addressLoading ? (
+                      <div className="flex justify-center py-10">
+                        <LoadingSpinner />
+                      </div>
+                    ) : addresses.length === 0 ? (
+                      <div className="py-10 text-center">
+                        <MapPin size={32} className="text-dark-300 mx-auto mb-3" />
+                        <p className="text-dark-600 font-medium mb-1">No saved addresses</p>
+                        <p className="text-dark-400 text-sm mb-4">Add a delivery address to continue</p>
+                        <Button variant="secondary" size="sm" onClick={() => setAddAddressOpen(true)}>
+                          <Plus size={14} /> Add Address
+                        </Button>
+                      </div>
                     ) : (
-                      <span className="flex items-center gap-2">Continue to Payment <ChevronRight size={16} /></span>
+                      <div className="space-y-2.5">
+                        {addresses.map((addr) => {
+                          const selected = selectedAddressId === addr.id;
+                          return (
+                            <button
+                              key={addr.id}
+                              onClick={() => handleAddressSelect(addr.id)}
+                              className={clsx(
+                                'w-full text-left p-4 rounded-xl border-2 transition-all',
+                                selected
+                                  ? 'border-brand-700 bg-brand-50 shadow-sm'
+                                  : 'border-dark-200 hover:border-dark-300 hover:bg-dark-50'
+                              )}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={clsx(
+                                  'w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center',
+                                  selected ? 'border-brand-700' : 'border-dark-400'
+                                )}>
+                                  {selected && <div className="w-2 h-2 rounded-full bg-brand-700" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-sm text-dark-900">
+                                      {addr.label || 'Address'}
+                                    </span>
+                                    {addr.isDefault && (
+                                      <span className="text-xs bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
+                                        Default
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-dark-700 mt-0.5 font-medium">{addr.recipientName}</p>
+                                  <p className="text-xs text-dark-500 mt-0.5">{addr.phone}</p>
+                                  <p className="text-xs text-dark-400 mt-0.5">
+                                    {addr.street}, {addr.city}, {addr.province} {addr.postalCode}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </Button>
+                  </div>
                 </div>
+
+                {/* ── Shipping options ── */}
+                {selectedAddressId && (
+                  <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-5 py-4 border-b border-dark-100">
+                      <Truck size={16} className="text-brand-700" />
+                      <h2 className="font-bold text-dark-900">Shipping</h2>
+                    </div>
+
+                    <div className="p-5">
+                      {shippingLoading ? (
+                        <div className="flex items-center gap-3 py-6 justify-center">
+                          <LoadingSpinner size="sm" />
+                          <span className="text-sm text-dark-500">Fetching shipping options...</span>
+                        </div>
+                      ) : shippingError ? (
+                        <div className="text-sm text-dark-500 py-2">{shippingError}</div>
+                      ) : shippingOptions.length === 0 ? (
+                        <p className="text-sm text-dark-400 py-2">No shipping options available for this route.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {shippingOptions.map((opt) => {
+                            const picked = selectedCourier?.key === opt.key;
+                            return (
+                              <button
+                                key={opt.key}
+                                onClick={() => setSelectedCourier(opt)}
+                                className={clsx(
+                                  'w-full text-left p-3.5 rounded-xl border-2 transition-all',
+                                  picked
+                                    ? 'border-brand-700 bg-brand-50'
+                                    : 'border-dark-200 hover:border-dark-300 hover:bg-dark-50'
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className={clsx(
+                                      'w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
+                                      picked ? 'border-brand-700' : 'border-dark-400'
+                                    )}>
+                                      {picked && <div className="w-2 h-2 rounded-full bg-brand-700" />}
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-semibold text-dark-900">
+                                        {opt.courier} {opt.service}
+                                      </p>
+                                      <p className="text-xs text-dark-400">{opt.description}{opt.etd ? ` · ${opt.etd} days` : ''}</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-sm font-bold text-dark-900 flex-shrink-0">
+                                    {formatCurrency(opt.cost)}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleAddressNext}
+                  disabled={!selectedAddressId || shippingLoading || (shippingOptions.length > 0 && !selectedCourier)}
+                >
+                  <span className="flex items-center gap-2">
+                    {shippingLoading
+                      ? <><LoadingSpinner size="sm" /> Checking shipping...</>
+                      : shippingOptions.length > 0 && !selectedCourier
+                      ? 'Select a shipping courier'
+                      : <>Continue to Payment <ChevronRight size={16} /></>
+                    }
+                  </span>
+                </Button>
               </div>
             )}
 
@@ -359,6 +533,24 @@ export function CheckoutPage() {
                     <Copy size={13} /> Copy
                   </button>
                 </div>
+
+                {/* Countdown timer */}
+                {timeLeft !== null && (
+                  <div className={`rounded-2xl border px-5 py-3 flex items-center gap-3 ${timeLeft <= 60000 ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-200'}`}>
+                    <Clock size={16} className={timeLeft <= 60000 ? 'text-red-500' : 'text-amber-500'} />
+                    <div>
+                      <p className={`text-xs font-medium ${timeLeft <= 60000 ? 'text-red-600' : 'text-amber-700'}`}>
+                        Complete payment within
+                      </p>
+                      <p className={`font-mono font-black text-lg ${timeLeft <= 60000 ? 'text-red-700' : 'text-amber-800'}`}>
+                        {String(Math.floor(timeLeft / 60000)).padStart(2, '0')}:{String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <p className={`text-xs ml-auto ${timeLeft <= 60000 ? 'text-red-500' : 'text-amber-500'}`}>
+                      Order auto-cancels if expired
+                    </p>
+                  </div>
+                )}
 
                 {/* QRIS */}
                 <div className="bg-white rounded-2xl border border-dark-200 p-6">
@@ -385,49 +577,25 @@ export function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Bank transfer */}
-                <div className="bg-dark-900 rounded-2xl p-5">
-                  <p className="text-sm font-semibold text-dark-300 mb-3">Transfer to:</p>
-                  <div className="space-y-3">
-                    {[
-                      { bank: 'BCA', number: '1234567890' },
-                      { bank: 'BNI', number: '0987654321' },
-                    ].map(({ bank, number }) => (
-                      <div key={bank} className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
-                        <div>
-                          <p className="text-xs font-bold text-dark-400">{bank}</p>
-                          <p className="font-mono font-black text-white text-xl tracking-widest">{number}</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(number);
-                            toast.success(`${bank} number copied!`);
-                          }}
-                          className="text-xs text-brand-400 hover:text-brand-300 font-bold px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    ))}
-                    <p className="text-xs text-dark-500 text-center pt-1">a.n. Spill the Bill</p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-white/10 text-center">
-                    <p className="text-xs text-dark-400 mb-1">Total to pay</p>
-                    <p className="text-2xl font-black text-brand-400">
-                      {formatCurrency(createdOrder?.total || 0)}
-                    </p>
-                  </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => setCancelModalOpen(true)}
+                  >
+                    Cancel Order
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => setStep(CHECKOUT_STEPS.UPLOAD_PROOF)}
+                  >
+                    <Upload size={16} />
+                    I&apos;ve paid — upload proof
+                  </Button>
                 </div>
-
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  onClick={() => setStep(CHECKOUT_STEPS.UPLOAD_PROOF)}
-                >
-                  <Upload size={16} />
-                  I&apos;ve paid — upload proof
-                </Button>
               </div>
             )}
 
@@ -536,6 +704,22 @@ export function CheckoutPage() {
                       <span>-{formatCurrency(summaryDiscount)}</span>
                     </div>
                   )}
+                  <div className="flex justify-between text-xs text-dark-600">
+                    <span className="flex items-center gap-1">
+                      <Truck size={11} />
+                      {selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : 'Shipping'}
+                    </span>
+                    <span>
+                      {shippingLoading
+                        ? '...'
+                        : summaryShipping > 0
+                        ? formatCurrency(summaryShipping)
+                        : selectedCourier
+                        ? 'Free'
+                        : '-'
+                      }
+                    </span>
+                  </div>
                   <div className="flex justify-between font-bold text-dark-900 border-t border-dark-100 pt-2 mt-2">
                     <span className="text-sm">Total</span>
                     <span className="text-brand-800">{formatCurrency(summaryTotal)}</span>
@@ -556,6 +740,82 @@ export function CheckoutPage() {
         </div>
       </div>
 
+      {/* ── Confirm Order Modal ── */}
+      <Modal
+        isOpen={confirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
+        title="Confirm Order"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="bg-dark-50 rounded-xl p-4 space-y-2 text-sm">
+            <div className="flex justify-between text-dark-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(summarySubtotal)}</span>
+            </div>
+            {summaryDiscount > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Voucher ({voucherCode})</span>
+                <span>-{formatCurrency(summaryDiscount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-dark-600">
+              <span>
+                {selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : 'Shipping'}
+              </span>
+              <span>{summaryShipping > 0 ? formatCurrency(summaryShipping) : 'Free'}</span>
+            </div>
+            <div className="flex justify-between font-black text-dark-900 border-t border-dark-200 pt-2">
+              <span>Total</span>
+              <span className="text-brand-800">{formatCurrency(summaryTotal)}</span>
+            </div>
+          </div>
+          <p className="text-dark-500 text-sm">
+            Please confirm your order. You will be shown the QRIS code to complete payment.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmModalOpen(false)}
+              disabled={createOrderMutation.isPending}
+            >
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={handleConfirmOrder}
+              disabled={createOrderMutation.isPending}
+            >
+              {createOrderMutation.isPending ? (
+                <span className="flex items-center gap-2"><LoadingSpinner size="sm" /> Placing...</span>
+              ) : 'Place Order'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Cancel Order Modal ── */}
+      <Modal
+        isOpen={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        title="Cancel Order"
+        size="sm"
+      >
+        <p className="text-dark-600 text-sm mb-6">
+          Are you sure you want to cancel this order? Stock will be restored and this action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={() => setCancelModalOpen(false)}>
+            No, keep it
+          </Button>
+          <Button variant="danger" className="flex-1" onClick={handleCancelOrder}>
+            Yes, cancel
+          </Button>
+        </div>
+      </Modal>
+
       {/* ── Add Address Modal ── */}
       <Modal
         isOpen={addAddressOpen}
@@ -563,63 +823,75 @@ export function CheckoutPage() {
         title="Add New Address"
         size="md"
       >
-        <form onSubmit={handleSubmit((d) => createAddressMutation.mutate(d))} className="space-y-4">
+        <form
+          onSubmit={handleSubmit((d) => {
+            if (!addrRegion.regency) {
+              toast.error('Pilih kabupaten/kota terlebih dahulu');
+              return;
+            }
+            createAddressMutation.mutate({
+              label: d.label,
+              recipientName: d.recipientName,
+              phone: d.phone,
+              street: d.street,
+              postalCode: d.postalCode || '',
+              province: addrRegion.province?.name || '',
+              city: addrRegion.regency?.name || '',
+              provinceCode: addrRegion.province?.id || null,
+              regencyCode: addrRegion.regency?.id || null,
+              districtCode: addrRegion.district?.id || null,
+              villageCode: addrRegion.village?.id || null,
+            });
+          })}
+          className="space-y-4"
+        >
           <Input
             label="Label"
-            placeholder="e.g. Home, Office"
+            placeholder="e.g. Rumah, Kantor"
             error={errors.label?.message}
-            {...register('label', { required: 'Label is required' })}
+            {...register('label', { required: 'Label wajib diisi' })}
           />
           <Input
-            label="Recipient Name"
+            label="Nama Penerima"
             required
-            placeholder="Full name"
+            placeholder="Nama lengkap"
             error={errors.recipientName?.message}
-            {...register('recipientName', { required: 'Recipient name is required' })}
+            {...register('recipientName', { required: 'Nama penerima wajib diisi' })}
           />
           <Input
-            label="Phone"
+            label="No. Telepon"
             required
             type="tel"
             placeholder="08xxxxxxxxxx"
             error={errors.phone?.message}
-            {...register('phone', { required: 'Phone is required' })}
+            {...register('phone', { required: 'No. telepon wajib diisi' })}
           />
           <Input
-            label="Street Address"
+            label="Alamat Lengkap"
             required
-            placeholder="Street name, building, apartment"
+            placeholder="Nama jalan, gedung, nomor rumah"
             error={errors.street?.message}
-            {...register('street', { required: 'Street is required' })}
+            {...register('street', { required: 'Alamat wajib diisi' })}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="City"
-              required
-              placeholder="City"
-              error={errors.city?.message}
-              {...register('city', { required: 'City is required' })}
-            />
-            <Input
-              label="Province"
-              required
-              placeholder="Province"
-              error={errors.province?.message}
-              {...register('province', { required: 'Province is required' })}
-            />
-          </div>
+
+          <WilayahSelect
+            onChange={({ province, regency, district, village }) =>
+              setAddrRegion({ province, regency, district, village })
+            }
+          />
+
           <Input
-            label="Postal Code"
+            label="Kode Pos"
             placeholder="12345"
             error={errors.postalCode?.message}
             {...register('postalCode')}
           />
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setAddAddressOpen(false)}>
-              Cancel
+              Batal
             </Button>
             <Button type="submit" variant="primary" className="flex-1" disabled={addingAddress || createAddressMutation.isPending}>
-              {createAddressMutation.isPending ? 'Saving...' : 'Save Address'}
+              {createAddressMutation.isPending ? 'Menyimpan...' : 'Simpan Alamat'}
             </Button>
           </div>
         </form>

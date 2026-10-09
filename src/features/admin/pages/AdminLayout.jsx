@@ -12,6 +12,7 @@ import {
   MessageSquare,
   CalendarDays,
   MapPin,
+  Layers,
   LogOut,
   Menu,
   X,
@@ -32,8 +33,9 @@ const NAV_SECTIONS = [
     label: 'Catalogue',
     items: [
       { to: '/admin/products',   icon: Package,    label: 'Products' },
-      { to: '/admin/categories', icon: Tag,         label: 'Categories' },
-      { to: '/admin/origins',    icon: MapPin,      label: 'Origins' },
+      { to: '/admin/categories',     icon: Tag,    label: 'Categories' },
+      { to: '/admin/product-types',  icon: Layers, label: 'Product Types' },
+      { to: '/admin/origins',        icon: MapPin, label: 'Origins' },
     ],
   },
   {

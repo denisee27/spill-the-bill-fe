@@ -5,6 +5,7 @@
 export const PRODUCT_TYPE = Object.freeze({
   JASTIP: 'JASTIP',
   PRELOVED: 'PRELOVED',
+  SERVICE: 'SERVICE',
 });
 
 export const ORDER_STATUS = Object.freeze({
@@ -50,6 +51,7 @@ export const TAB_VALUES = Object.freeze({
   ALL: 'all',
   JASTIP: 'jastip',
   PRELOVED: 'preloved',
+  SERVICE: 'service',
 });
 
 export const USER_ROLES = Object.freeze({

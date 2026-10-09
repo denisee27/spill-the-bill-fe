@@ -214,8 +214,8 @@ export function AdminDashboardPage() {
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
       {/* Alert */}
-      <div className="flex justify-end">
-        {(stats.pendingPayments ?? stats.checkingPayments ?? 0) > 0 && (
+      {(stats.pendingPayments ?? stats.checkingPayments ?? 0) > 0 && (
+        <div className="flex justify-start">
           <Link
             to="/admin/orders?status=CHECKING_PAYMENT"
             className="flex items-center gap-2 px-3 py-2 bg-yellow-50 border border-yellow-300 rounded-xl text-sm font-bold text-yellow-800 hover:bg-yellow-100 transition-colors"
@@ -223,8 +223,8 @@ export function AdminDashboardPage() {
             <AlertTriangle size={15} aria-hidden="true" />
             {stats.pendingPayments ?? stats.checkingPayments} awaiting verification
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Stat cards */}
       {isLoading ? (

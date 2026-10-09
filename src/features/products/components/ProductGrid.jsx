@@ -6,7 +6,7 @@ import { PackageSearch } from 'lucide-react';
 /**
  * Responsive product grid with loading skeletons and empty state.
  */
-export function ProductGrid({ products = [], isLoading = false, onAddToCart }) {
+export function ProductGrid({ products = [], isLoading = false, onAddToCart, onRequireAuth }) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
@@ -34,6 +34,7 @@ export function ProductGrid({ products = [], isLoading = false, onAddToCart }) {
           key={product.id}
           product={product}
           onAddToCart={onAddToCart}
+          onRequireAuth={onRequireAuth}
         />
       ))}
     </div>

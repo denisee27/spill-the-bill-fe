@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
-import { getProducts, deleteProduct, updateProductStock, bulkSoldOut } from '../../products/services/product.service';
+import { Plus, Edit, Trash2, Search, Copy } from 'lucide-react';
+import { getAdminProducts, deleteProduct, updateProductStock, bulkSoldOut, duplicateProduct } from '../../products/services/product.service';
 import { ProductBadge } from '../../products/components/ProductBadge';
 import Button from '../../../shared/components/Button';
 import LoadingSpinner from '../../../shared/components/LoadingSpinner';
@@ -22,7 +22,7 @@ export function AdminProductsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'products', search],
-    queryFn: () => getProducts({ search }),
+    queryFn: () => getAdminProducts({ search }),
     staleTime: 15_000,
   });
 
@@ -57,6 +57,16 @@ export function AdminProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
     onError: (err) => toast.error(err?.response?.data?.error || 'Failed to update stock'),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id) => duplicateProduct(id),
+    onSuccess: () => {
+      toast.success('Product duplicated (saved as inactive)');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to duplicate'),
   });
 
 
@@ -241,6 +251,16 @@ export function AdminProductsPage() {
                               Sold Out
                             </span>
                           )}
+                          {p.status === 'DRAFT' && (
+                            <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                              Draft
+                            </span>
+                          )}
+                          {p.status === 'INACTIVE' && (
+                            <span className="text-xs font-bold text-dark-400 bg-dark-100 border border-dark-200 px-2 py-0.5 rounded-full">
+                              Inactive
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -251,6 +271,14 @@ export function AdminProductsPage() {
                             className="p-1.5 text-dark-500 hover:text-brand-800 hover:bg-brand-50 rounded-lg transition-colors inline-flex"
                           >
                             <Edit size={15} aria-hidden="true" />
+                          </button>
+                          <button
+                            onClick={() => duplicateMutation.mutate(p.id)}
+                            aria-label={`Duplicate ${p.name}`}
+                            disabled={duplicateMutation.isPending}
+                            className="p-1.5 text-dark-500 hover:text-brand-800 hover:bg-brand-50 rounded-lg transition-colors inline-flex disabled:opacity-40"
+                          >
+                            <Copy size={15} aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(p)}

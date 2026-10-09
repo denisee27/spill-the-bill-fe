@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './providers/AuthProvider';
 import { ProtectedRoute, AdminRoute, AdminRedirect } from './router/index';
 import { ToastContainer } from '../shared/components/Toast';
@@ -31,6 +32,7 @@ const AdminUsersPage = lazy(() => import('../features/admin/pages/AdminUsersPage
 const AdminUserDetailPage = lazy(() => import('../features/admin/pages/AdminUserDetailPage').then((m) => ({ default: m.AdminUserDetailPage })));
 const AdminWhatsappPage = lazy(() => import('../features/admin/pages/AdminWhatsappPage').then((m) => ({ default: m.AdminWhatsappPage })));
 const AdminOriginsPage = lazy(() => import('../features/admin/pages/AdminOriginsPage').then((m) => ({ default: m.AdminOriginsPage })));
+const AdminProductTypesPage = lazy(() => import('../features/admin/pages/AdminProductTypesPage').then((m) => ({ default: m.AdminProductTypesPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +53,7 @@ function PageLoader() {
 
 export function App() {
   return (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
@@ -85,6 +88,7 @@ export function App() {
                   <Route path="members" element={<AdminMembersPage />} />
                   <Route path="events" element={<AdminEventsPage />} />
                   <Route path="origins" element={<AdminOriginsPage />} />
+                  <Route path="product-types" element={<AdminProductTypesPage />} />
                   <Route path="users" element={<AdminUsersPage />} />
                   <Route path="users/:id" element={<AdminUserDetailPage />} />
                   <Route path="whatsapp" element={<AdminWhatsappPage />} />
@@ -98,6 +102,7 @@ export function App() {
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 

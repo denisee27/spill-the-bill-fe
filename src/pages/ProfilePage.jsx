@@ -20,6 +20,7 @@ import {
   Trash2,
   Check,
   X,
+  Heart,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCart } from '../features/cart/hooks/useCart';
@@ -28,7 +29,7 @@ import LoadingSpinner from '../shared/components/LoadingSpinner';
 import Modal from '../shared/components/Modal';
 import Button from '../shared/components/Button';
 import { WilayahSelect } from '../shared/components/WilayahSelect';
-import { formatCurrency, formatDate } from '../shared/utils/format';
+import { formatCurrency, formatDate, imageUrl } from '../shared/utils/format';
 import api from '../shared/services/api';
 import { Footer } from '../shared/components/Footer';
 import {
@@ -38,6 +39,7 @@ import {
   setDefaultAddress,
   deleteAddress,
 } from '../features/orders/services/order.service';
+import { getMyFavorites } from '../features/favorites/services/favorite.service';
 
 async function getMemberProgress() {
   const res = await api.get('/members/my-progress');
@@ -72,7 +74,14 @@ export function ProfilePage() {
   });
   const addresses = addressData?.data ?? addressData ?? [];
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm();
+  const { data: favoritesData, isLoading: favLoading } = useQuery({
+    queryKey: ['my-favorites'],
+    queryFn: getMyFavorites,
+    enabled: isAuthenticated,
+  });
+  const favorites = favoritesData?.data ?? [];
+
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm();
 
   const invalidateAddresses = () => queryClient.invalidateQueries({ queryKey: ['addresses'] });
 
@@ -319,6 +328,65 @@ export function ProfilePage() {
             <ChevronRight size={16} className="text-dark-400 group-hover:text-brand-800 transition-colors" />
           </Link>
         </div>
+
+        {/* Favorites */}
+        {isAuthenticated && (
+          <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-dark-100">
+              <h2 className="font-bold text-dark-900 flex items-center gap-2">
+                <Heart size={16} className="text-red-500" fill="currentColor" /> My Favorites
+              </h2>
+              <span className="text-xs text-dark-400">{favorites.length} item{favorites.length !== 1 ? 's' : ''}</span>
+            </div>
+
+            {favLoading ? (
+              <div className="flex justify-center py-8">
+                <LoadingSpinner size="md" />
+              </div>
+            ) : favorites.length === 0 ? (
+              <div className="px-5 py-8 text-center">
+                <Heart size={28} className="text-dark-300 mx-auto mb-2" />
+                <p className="text-sm text-dark-500">No favorites yet.</p>
+                <Link to="/home" className="mt-2 inline-block text-sm text-brand-700 hover:underline font-medium">
+                  Browse products
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-dark-100">
+                {favorites.map(({ product }) => {
+                  if (!product) return null;
+                  const imgs = product.images || [];
+                  const raw = imgs[0]?.url || imgs[0] || null;
+                  const src = raw ? imageUrl(raw) : null;
+                  const displayPrice = product.displayPrice ?? product.price;
+                  return (
+                    <Link
+                      key={product.id}
+                      to={`/products/${product.id}`}
+                      className="bg-white flex items-center gap-3 p-3 hover:bg-dark-50 transition-colors group"
+                    >
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-dark-100 flex-shrink-0">
+                        {src ? (
+                          <img src={src} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-dark-300 text-lg">?</div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-dark-900 line-clamp-2 leading-snug group-hover:text-brand-800 transition-colors">
+                          {product.name}
+                        </p>
+                        <p className="text-brand-800 font-black text-sm mt-0.5">
+                          {formatCurrency(displayPrice)}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Alamat Pengiriman */}
         {isAuthenticated && (

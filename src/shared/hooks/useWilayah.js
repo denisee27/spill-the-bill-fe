@@ -1,34 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { getProvinces, getRegencies, getDistricts, getVillages } from '../services/region.service';
 
-const BASE_LOCAL = '/data/wilayah';
-const BASE_API = 'https://wilayah.id/api';
-
-const fetchJson = (url) => fetch(url).then((r) => r.json()).then((d) => d.data || d);
-
-export const useWilayah = () => {
+export const useWilayah = (initialValue = {}) => {
   const [provinces, setProvinces] = useState([]);
   const [regencies, setRegencies] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [villages, setVillages] = useState([]);
-  const [loading, setLoading] = useState({ regencies: false, districts: false, villages: false });
+  const [loading, setLoading] = useState({ provinces: false, regencies: false, districts: false, villages: false });
 
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedRegency, setSelectedRegency] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedVillage, setSelectedVillage] = useState('');
 
+  // Prevents cascade resets during initial value hydration
+  const skipCascade = useRef(false);
+
   useEffect(() => {
-    fetchJson(`${BASE_LOCAL}/provinces.json`).then(setProvinces).catch(() => {});
+    setLoading((l) => ({ ...l, provinces: true }));
+    getProvinces()
+      .then((data) => {
+        setProvinces(data);
+        if (initialValue.provinceId) {
+          skipCascade.current = true;
+          setSelectedProvince(initialValue.provinceId);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading((l) => ({ ...l, provinces: false })));
   }, []);
 
   useEffect(() => {
     if (!selectedProvince) { setRegencies([]); return; }
     setLoading((l) => ({ ...l, regencies: true }));
-    setSelectedRegency('');
-    setSelectedDistrict('');
-    setSelectedVillage('');
-    fetchJson(`${BASE_API}/regencies/${selectedProvince}.json`)
-      .then(setRegencies)
+    if (!skipCascade.current) {
+      setSelectedRegency('');
+      setSelectedDistrict('');
+      setSelectedVillage('');
+      setDistricts([]);
+      setVillages([]);
+    }
+    getRegencies(selectedProvince)
+      .then((data) => {
+        setRegencies(data);
+        if (skipCascade.current && initialValue.regencyId) {
+          setSelectedRegency(initialValue.regencyId);
+        } else {
+          skipCascade.current = false;
+        }
+      })
       .catch(() => setRegencies([]))
       .finally(() => setLoading((l) => ({ ...l, regencies: false })));
   }, [selectedProvince]);
@@ -36,10 +56,20 @@ export const useWilayah = () => {
   useEffect(() => {
     if (!selectedRegency) { setDistricts([]); return; }
     setLoading((l) => ({ ...l, districts: true }));
-    setSelectedDistrict('');
-    setSelectedVillage('');
-    fetchJson(`${BASE_API}/districts/${selectedRegency}.json`)
-      .then(setDistricts)
+    if (!skipCascade.current) {
+      setSelectedDistrict('');
+      setSelectedVillage('');
+      setVillages([]);
+    }
+    getDistricts(selectedRegency)
+      .then((data) => {
+        setDistricts(data);
+        if (skipCascade.current && initialValue.districtId) {
+          setSelectedDistrict(initialValue.districtId);
+        } else {
+          skipCascade.current = false;
+        }
+      })
       .catch(() => setDistricts([]))
       .finally(() => setLoading((l) => ({ ...l, districts: false })));
   }, [selectedRegency]);
@@ -47,14 +77,23 @@ export const useWilayah = () => {
   useEffect(() => {
     if (!selectedDistrict) { setVillages([]); return; }
     setLoading((l) => ({ ...l, villages: true }));
-    setSelectedVillage('');
-    fetchJson(`${BASE_API}/villages/${selectedDistrict}.json`)
-      .then(setVillages)
+    if (!skipCascade.current) {
+      setSelectedVillage('');
+    }
+    getVillages(selectedDistrict)
+      .then((data) => {
+        setVillages(data);
+        if (skipCascade.current && initialValue.villageId) {
+          setSelectedVillage(initialValue.villageId);
+        }
+        skipCascade.current = false;
+      })
       .catch(() => setVillages([]))
       .finally(() => setLoading((l) => ({ ...l, villages: false })));
   }, [selectedDistrict]);
 
   const reset = () => {
+    skipCascade.current = false;
     setSelectedProvince('');
     setSelectedRegency('');
     setSelectedDistrict('');
