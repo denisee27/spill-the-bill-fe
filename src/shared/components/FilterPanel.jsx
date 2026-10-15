@@ -204,15 +204,16 @@ export function FilterPanel({
               />
             </div>
           )}
-        </div>
 
-        <div className="flex-shrink-0 px-5 py-4 border-t border-dark-100 flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={handleReset}>
-            Reset
-          </Button>
-          <Button variant="primary" className="flex-1" onClick={handleApply}>
-            Apply
-          </Button>
+          {/* Actions — right after last filter */}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={handleReset}>
+              Reset
+            </Button>
+            <Button variant="primary" className="flex-1" onClick={handleApply}>
+              Apply
+            </Button>
+          </div>
         </div>
       </div>
     </div>

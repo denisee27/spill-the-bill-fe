@@ -491,7 +491,7 @@ export function AdminEventsPage() {
                     const product = ep.product ?? ep;
                     const productId = ep.productId ?? product.id;
                     const images = parseImages(product.images);
-                    const thumb = images[0] ? imageUrl(images[0]) : null;
+                    const thumb = images[0] ? imageUrl(images[0]?.url || images[0]) : null;
                     const variantCount = product.variants?.length ?? 0;
                     return (
                       <li
@@ -589,7 +589,11 @@ export function AdminEventsPage() {
                 <ul className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
                   {filteredProducts.map((p) => {
                     const images = parseImages(p.images);
-                    const thumb = images[0] ? imageUrl(images[0]) : null;
+                    const thumb = images[0] ? imageUrl(images[0]?.url || images[0]) : null;
+                    const minVariantPrice = p.variants?.length > 0
+                      ? Math.min(...p.variants.map((v) => v.price))
+                      : 0;
+                    const displayPrice = p.price > 0 ? p.price : minVariantPrice;
                     const isAdding =
                       addProductMutation.isPending &&
                       addProductMutation.variables?.productId === p.id;
@@ -616,7 +620,7 @@ export function AdminEventsPage() {
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-dark-800 truncate">{p.name}</p>
-                            <p className="text-xs text-dark-400">{formatCurrency(p.price)}</p>
+                            <p className="text-xs text-dark-400">{formatCurrency(displayPrice)}</p>
                           </div>
                           <div className="flex-shrink-0">
                             {isAdding ? (

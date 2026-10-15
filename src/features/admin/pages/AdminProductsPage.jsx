@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Plus, Edit, Trash2, Search, Copy, ChevronUp, ChevronDown, ChevronsUpDown, SlidersHorizontal, X } from 'lucide-react';
 import {
   getAdminProducts, deleteProduct, updateProductStock,
-  bulkSoldOut, duplicateProduct, getCategories,
+  bulkSoldOut, getCategories,
 } from '../../products/services/product.service';
 import { useProductTypes } from '../../../shared/hooks/useProductTypes';
 import { ProductBadge } from '../../products/components/ProductBadge';
@@ -73,7 +73,7 @@ export function AdminProductsPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [editingStockId, setEditingStockId] = useState(null);
   const [editingStockValue, setEditingStockValue] = useState('');
-  const [productModal, setProductModal] = useState({ open: false, productId: null });
+  const [productModal, setProductModal] = useState({ open: false, productId: null, isDuplicate: false });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const queryClient = useQueryClient();
 
@@ -143,20 +143,6 @@ export function AdminProductsPage() {
     onError: (err) => toast.error(err?.response?.data?.error || 'Failed to update stock'),
   });
 
-  const duplicateMutation = useMutation({
-    mutationFn: (id) => duplicateProduct(id),
-    onSuccess: (res) => {
-      const newId = res?.data?.id || res?.id;
-      queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      if (newId) {
-        setProductModal({ open: true, productId: newId });
-      } else {
-        toast.success('Product duplicated');
-      }
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to duplicate'),
-  });
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -430,7 +416,7 @@ export function AdminProductsPage() {
                           <button onClick={() => setProductModal({ open: true, productId: p.id })} aria-label={`Edit ${p.name}`} className="p-1.5 text-dark-500 hover:text-brand-800 hover:bg-brand-50 rounded-lg transition-colors inline-flex">
                             <Edit size={15} aria-hidden="true" />
                           </button>
-                          <button onClick={() => duplicateMutation.mutate(p.id)} aria-label={`Duplicate ${p.name}`} disabled={duplicateMutation.isPending} className="p-1.5 text-dark-500 hover:text-brand-800 hover:bg-brand-50 rounded-lg transition-colors inline-flex disabled:opacity-40">
+                          <button onClick={() => setProductModal({ open: true, productId: p.id, isDuplicate: true })} aria-label={`Duplicate ${p.name}`} className="p-1.5 text-dark-500 hover:text-brand-800 hover:bg-brand-50 rounded-lg transition-colors inline-flex">
                             <Copy size={15} aria-hidden="true" />
                           </button>
                           <button onClick={() => setDeleteTarget(p)} aria-label={`Delete ${p.name}`} className="p-1.5 text-dark-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
@@ -449,8 +435,9 @@ export function AdminProductsPage() {
 
       <AdminProductModal
         isOpen={productModal.open}
-        onClose={() => setProductModal({ open: false, productId: null })}
+        onClose={() => setProductModal({ open: false, productId: null, isDuplicate: false })}
         productId={productModal.productId}
+        isDuplicate={productModal.isDuplicate}
       />
 
       <ConfirmModal

@@ -141,8 +141,8 @@ function VariantRow({
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
-export function AdminProductModal({ isOpen, onClose, productId }) {
-  const isEdit = Boolean(productId);
+export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = false }) {
+  const isEdit = Boolean(productId) && !isDuplicate;
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState(0);
   const [images, setImages] = useState([]);
@@ -181,7 +181,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
   const { data: productData, isLoading: productLoading } = useQuery({
     queryKey: ['product', 'admin', productId],
     queryFn: () => getProductAdmin(productId),
-    enabled: isEdit && isOpen,
+    enabled: Boolean(productId) && isOpen,
   });
 
   const { types: productTypes } = useProductTypes({ includeInactive: true });
@@ -218,7 +218,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     }
   }, [isOpen, reset]);
 
-  // Populate on edit
+  // Populate on edit or duplicate
   useEffect(() => {
     if (!productData) return;
     const p = productData?.data || productData?.product || productData;
@@ -226,7 +226,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     const withVariants = variants.length > 0;
 
     reset({
-      name: p.name,
+      name: isDuplicate ? `Copy of ${p.name}` : p.name,
       type: p.type,
       categoryId: p.categoryId || p.category?.id,
       description: p.description,
@@ -235,7 +235,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
       originalPrice: withVariants ? '' : (p.originalPrice || ''),
       stock: withVariants ? '' : p.stock,
       variants: variants.map((v) => ({
-        id: v.id,
+        // strip id so backend creates new variants
         name: v.name,
         price: v.price,
         fee: v.fee || 0,
@@ -243,9 +243,9 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
         stock: v.stock ?? 0,
       })),
       condition: p.condition || 'New',
-      status: p.status || 'ACTIVE',
+      status: isDuplicate ? 'DRAFT' : (p.status || 'ACTIVE'),
       originId: p.originId || '',
-      eventId: p.eventProducts?.[0]?.eventId || '',
+      eventId: isDuplicate ? '' : (p.eventProducts?.[0]?.eventId || ''),
       freeShipping: p.freeShipping ?? false,
     });
 
@@ -308,6 +308,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
   const saveMutation = useMutation({
     mutationFn: (fd) => (isEdit ? updateProduct(productId, fd) : createProduct(fd)),
     onSuccess: async (result) => {
+      // isEdit already false for duplicate, so createProduct is called automatically
       const savedProductId = result?.data?.id || result?.id;
       if (pendingEventIdRef.current && savedProductId) {
         try {
@@ -317,7 +318,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
         } catch { /* non-critical */ }
         pendingEventIdRef.current = null;
       }
-      toast.success(isEdit ? 'Product updated!' : 'Product created!');
+      toast.success(isEdit ? 'Product updated!' : isDuplicate ? 'Product duplicated!' : 'Product created!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'products'] });
       onClose();
@@ -381,8 +382,8 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
   const TABS = ['Basic Info', 'Pricing & Stock', 'Media', ...(watchedType === 'JASTIP' ? ['Event'] : [])];
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Product' : 'Add Product'} size="lg">
-      {isEdit && productLoading ? (
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Product' : isDuplicate ? 'Duplicate Product' : 'Add Product'} size="lg">
+      {(isEdit || isDuplicate) && productLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)}>

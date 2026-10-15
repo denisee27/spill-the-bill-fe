@@ -209,8 +209,8 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* Sticky tab bar */}
-        <div className="sticky top-[57px] z-30 bg-dark-50/90 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-3 mb-4">
+        {/* Sticky tab bar + filter bar */}
+        <div className="sticky top-[57px] z-30 bg-dark-50/90 backdrop-blur-md -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-3 mb-4 space-y-2">
           <div role="tablist" className="flex gap-1 bg-white rounded-xl p-1 border border-dark-200 w-fit mx-auto sm:mx-0">
             {TABS.map(({ value, label }) => {
               const count = value === TAB_VALUES.JASTIP ? events.length : products.length;
@@ -238,36 +238,36 @@ export function HomePage() {
               );
             })}
           </div>
-        </div>
 
-        {/* Filter bar — products tabs only */}
-        {!isJastipTab && (
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setFilterOpen(true)}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 border rounded-xl text-sm font-medium transition-colors',
-                hasActiveFilters
-                  ? 'bg-brand-800 text-white border-brand-800'
-                  : 'bg-white text-dark-700 border-dark-200 hover:border-dark-400'
-              )}
-            >
-              <SlidersHorizontal size={14} />
-              Filter
-              {hasActiveFilters && (
-                <span className="w-2 h-2 bg-white rounded-full" />
-              )}
-            </button>
-            {hasActiveFilters && (
+          {/* Filter bar — products tab only */}
+          {!isJastipTab && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleFilterReset}
-                className="text-xs text-dark-500 hover:text-dark-800 underline"
+                onClick={() => setFilterOpen(true)}
+                className={clsx(
+                  'flex items-center gap-2 px-4 py-2 border rounded-xl text-sm font-medium transition-colors',
+                  hasActiveFilters
+                    ? 'bg-brand-800 text-white border-brand-800'
+                    : 'bg-white text-dark-700 border-dark-200 hover:border-dark-400'
+                )}
               >
-                Reset
+                <SlidersHorizontal size={14} />
+                Filter
+                {hasActiveFilters && (
+                  <span className="w-2 h-2 bg-white rounded-full" />
+                )}
               </button>
-            )}
-          </div>
-        )}
+              {hasActiveFilters && (
+                <button
+                  onClick={handleFilterReset}
+                  className="text-xs text-dark-500 hover:text-dark-800 underline"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <FilterPanel
           isOpen={filterOpen}

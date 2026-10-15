@@ -59,6 +59,7 @@ const [timeLeft, setTimeLeft] = useState(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState(null);
   const [selectedCourier, setSelectedCourier] = useState(null);
+  const [orderNote, setOrderNote] = useState('');
 
   const { items: cartItems, cartCount } = useCart({ isAuthenticated });
 
@@ -234,6 +235,7 @@ const [timeLeft, setTimeLeft] = useState(null);
       voucherCode: voucherCode || undefined,
       shippingFee: selectedCourier?.cost ?? 0,
       courierService: selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : undefined,
+      notes: orderNote.trim() || undefined,
     });
   };
 
@@ -514,6 +516,26 @@ const [timeLeft, setTimeLeft] = useState(null);
                     </div>
                   </div>
                 )}
+
+                {/* Note for seller */}
+                <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
+                  <div className="flex items-center gap-2 px-5 py-4 border-b border-dark-100">
+                    <Tag size={15} className="text-brand-700" />
+                    <h2 className="font-bold text-dark-900">Catatan untuk Penjual</h2>
+                    <span className="text-xs text-dark-400 ml-1">(opsional)</span>
+                  </div>
+                  <div className="p-5">
+                    <textarea
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      placeholder="Tulis catatan atau permintaan khusus untuk penjual..."
+                      rows={3}
+                      maxLength={500}
+                      className="w-full px-3 py-2.5 text-sm border border-dark-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-brand-700 placeholder:text-dark-300"
+                    />
+                    <p className="text-xs text-dark-400 text-right mt-1">{orderNote.length}/500</p>
+                  </div>
+                </div>
 
                 <Button
                   variant="primary"
@@ -798,6 +820,12 @@ const [timeLeft, setTimeLeft] = useState(null);
               <span className="text-brand-800">{formatCurrency(summaryTotal)}</span>
             </div>
           </div>
+          {orderNote.trim() && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1">Catatan untuk Penjual</p>
+              <p className="text-sm text-amber-800">{orderNote.trim()}</p>
+            </div>
+          )}
           <p className="text-dark-500 text-sm">
             Please confirm your order. You will be shown the QRIS code to complete payment.
           </p>

@@ -369,6 +369,14 @@ export function OrderDetailPage() {
               </div>
             )}
 
+            {/* ── Order note ── */}
+            {order.notes && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                <h2 className="font-bold text-dark-900 mb-1 text-sm">Catatan untuk Penjual</h2>
+                <p className="text-sm text-amber-800">{order.notes}</p>
+              </div>
+            )}
+
             {/* ── Total breakdown ── */}
             <div className="bg-white rounded-2xl border border-dark-200 p-5">
               <h2 className="font-bold text-dark-900 mb-3">Payment Summary</h2>
