@@ -295,7 +295,20 @@ export function AdminOrderDetailPage() {
                 <span>Subtotal</span>
                 <span>{formatCurrency(order.subtotal ?? 0)}</span>
               </div>
-              {(order.shippingFee ?? 0) > 0 && (
+              {order.courierService && (
+                <div className="flex justify-between text-sm text-dark-600">
+                  <span className="flex items-center gap-1.5">
+                    <Truck size={13} className="text-dark-400" />
+                    {order.courierService}
+                  </span>
+                  <span>
+                    {(order.shippingFee ?? 0) > 0
+                      ? formatCurrency(order.shippingFee)
+                      : <span className="text-green-600 font-medium">Free</span>}
+                  </span>
+                </div>
+              )}
+              {!order.courierService && (order.shippingFee ?? 0) > 0 && (
                 <div className="flex justify-between text-sm text-dark-600">
                   <span>Shipping fee</span>
                   <span>{formatCurrency(order.shippingFee)}</span>

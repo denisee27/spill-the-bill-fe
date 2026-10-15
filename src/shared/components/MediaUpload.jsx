@@ -29,8 +29,8 @@ function addCanvasWatermark(ctx, W, H) {
 
 async function removeBackgroundToWhite(productFile) {
   const bgRemovedBlob = await removeBackground(productFile, {
-    output: { format: 'image/png', type: 'foreground', quality: 1 },
-    model: 'medium',
+    output: { format: 'image/png', type: 'foreground', quality: 0.9 },
+    model: 'small',
   });
 
   const product = await loadImage(URL.createObjectURL(bgRemovedBlob));

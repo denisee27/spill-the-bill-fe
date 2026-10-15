@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { ChevronLeft, UploadCloud, Clock, Eye, CheckCircle, Package, Truck, Check, XCircle, ImageOff } from 'lucide-react';
+import { WriteReviewCard } from '../features/reviews/components/WriteReviewCard';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCart } from '../features/cart/hooks/useCart';
 import { useOrder } from '../features/orders/hooks/useOrders';
@@ -52,20 +53,32 @@ export function OrderDetailPage() {
   const [proofFiles, setProofFiles] = useState([]);
   const [refundMethod, setRefundMethod] = useState('BANK');
   const [timeLeft, setTimeLeft] = useState(null);
+  const expiredRef = useRef(false);
 
   const { register, handleSubmit, reset } = useForm();
 
   useEffect(() => {
     if (!order || order.status !== 'PENDING_PAYMENT') return;
-    const deadline = new Date(order.createdAt).getTime() + 24 * 60 * 60 * 1000;
+    expiredRef.current = false;
+    const deadline = order.expiresAt
+      ? new Date(order.expiresAt).getTime()
+      : new Date(order.createdAt).getTime() + 30 * 60 * 1000;
     const tick = () => {
       const diff = deadline - Date.now();
-      setTimeLeft(diff > 0 ? diff : 0);
+      if (diff <= 0) {
+        setTimeLeft(0);
+        if (!expiredRef.current) {
+          expiredRef.current = true;
+          cancelMutation.mutate();
+        }
+      } else {
+        setTimeLeft(diff);
+      }
     };
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [order?.createdAt, order?.status]);
+  }, [order?.expiresAt, order?.createdAt, order?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const uploadMutation = useMutation({
     mutationFn: (files) => {
@@ -117,8 +130,6 @@ export function OrderDetailPage() {
     const s = Math.floor((ms % 60_000) / 1_000);
     return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
   };
-
-  const canUploadProof = order?.status === ORDER_STATUS.PENDING_PAYMENT;
 
   const items = order?.orderItems || order?.items || [];
   const proofs = order?.paymentProofs || order?.proofs || [];
@@ -227,16 +238,38 @@ export function OrderDetailPage() {
             {/* ── QRIS payment panel (PENDING_PAYMENT only) ── */}
             {order.status === ORDER_STATUS.PENDING_PAYMENT && (
               <div className="bg-white rounded-2xl border-2 border-brand-200 p-5">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="font-bold text-dark-900">Complete Your Payment</h2>
-                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${timeLeft === 0 ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                    <Clock size={11} />
-                    {timeLeft === 0 ? 'Expired' : formatCountdown(timeLeft)}
+                <h2 className="font-bold text-dark-900 mb-3">Complete Your Payment</h2>
+
+                {/* Countdown timer */}
+                {timeLeft !== null && (
+                  <div className={`rounded-xl border px-4 py-3 mb-4 flex items-center gap-3 ${
+                    timeLeft === 0
+                      ? 'bg-red-50 border-red-300'
+                      : timeLeft <= 60_000
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <Clock size={18} className={timeLeft <= 60_000 ? 'text-red-500' : 'text-amber-500'} />
+                    <div className="flex-1">
+                      <p className={`text-xs font-medium ${timeLeft <= 60_000 ? 'text-red-600' : 'text-amber-700'}`}>
+                        {timeLeft === 0 ? 'Waktu pembayaran habis' : 'Selesaikan pembayaran dalam'}
+                      </p>
+                      <p className={`font-mono font-black text-2xl tracking-widest mt-0.5 ${
+                        timeLeft === 0 ? 'text-red-700' : timeLeft <= 60_000 ? 'text-red-700' : 'text-amber-900'
+                      }`}>
+                        {timeLeft === 0 ? '00:00:00' : formatCountdown(timeLeft)}
+                      </p>
+                    </div>
+                    {timeLeft > 0 && (
+                      <p className={`text-[11px] text-right leading-tight ${timeLeft <= 60_000 ? 'text-red-400' : 'text-amber-400'}`}>
+                        Order akan otomatis<br />dibatalkan jika expired
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
+
                 <p className="text-xs text-dark-400 mb-5">
-                  Scan the QRIS code below using your banking or e-wallet app, then upload your payment proof.
-                  {timeLeft > 0 && <span className="text-amber-600 font-medium"> Order will be automatically cancelled if payment is not completed within the deadline.</span>}
+                  Scan kode QRIS di bawah menggunakan aplikasi banking atau e-wallet, lalu upload bukti pembayaran.
                 </p>
 
                 <div className="flex flex-col items-center gap-4">
@@ -342,18 +375,41 @@ export function OrderDetailPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-dark-700">
                   <span>Subtotal</span>
-                  <span>{formatCurrency(order.subtotal)}</span>
+                  <span>{formatCurrency(order.subtotal ?? 0)}</span>
                 </div>
-                {order.discount > 0 && (
+                {(order.discountAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-green-700">
-                    <span>Discount</span>
-                    <span>-{formatCurrency(order.discount)}</span>
+                    <span className="flex items-center gap-1.5">
+                      Discount
+                      {order.voucherCode && (
+                        <span className="font-mono text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                          {order.voucherCode}
+                        </span>
+                      )}
+                    </span>
+                    <span>-{formatCurrency(order.discountAmount)}</span>
                   </div>
                 )}
-                {order.shippingCost !== undefined && (
+                {order.courierService && (
                   <div className="flex justify-between text-dark-700">
-                    <span>Shipping</span>
-                    <span>{formatCurrency(order.shippingCost)}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Truck size={12} className="text-dark-400" />
+                      {order.courierService}
+                    </span>
+                    <span>
+                      {(order.shippingFee ?? 0) > 0
+                        ? formatCurrency(order.shippingFee)
+                        : <span className="text-green-600 font-medium">Free</span>}
+                    </span>
+                  </div>
+                )}
+                {!order.courierService && (order.shippingFee ?? 0) > 0 && (
+                  <div className="flex justify-between text-dark-700">
+                    <span className="flex items-center gap-1.5">
+                      <Truck size={12} className="text-dark-400" />
+                      Shipping
+                    </span>
+                    <span>{formatCurrency(order.shippingFee)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-dark-900 border-t border-dark-100 pt-2">
@@ -506,6 +562,42 @@ export function OrderDetailPage() {
                 <p className="text-sm font-semibold text-green-700">Refund details submitted. Admin is processing the transfer.</p>
               </div>
             )}
+
+            {/* ── DELIVERED: review per product ── */}
+            {order.status === ORDER_STATUS.DELIVERED && items.length > 0 && (() => {
+              const uniqueProducts = items.reduce((acc, item) => {
+                const pid = item.productId || item.product?.id;
+                if (pid && !acc.find((x) => x.productId === pid)) {
+                  const product = item.product || {};
+                  const rawImgs = Array.isArray(product.images)
+                    ? product.images
+                    : (() => { try { return JSON.parse(product.images || '[]'); } catch { return []; } })();
+                  acc.push({
+                    productId: pid,
+                    productName: product.name || item.productName,
+                    productImage: rawImgs?.[0]?.url || rawImgs?.[0] || null,
+                  });
+                }
+                return acc;
+              }, []);
+
+              return (
+                <div className="bg-white rounded-2xl border border-dark-200 p-5">
+                  <h2 className="font-bold text-dark-900 mb-4">Rate Your Products</h2>
+                  <div className="space-y-5 divide-y divide-dark-100">
+                    {uniqueProducts.map((p, i) => (
+                      <div key={p.productId} className={i > 0 ? 'pt-5' : ''}>
+                        <WriteReviewCard
+                          productId={p.productId}
+                          productName={p.productName}
+                          productImage={p.productImage}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

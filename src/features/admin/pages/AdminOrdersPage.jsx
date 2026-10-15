@@ -126,6 +126,8 @@ export function AdminOrdersPage() {
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Order</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Customer</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Date</th>
+                  <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Kurir</th>
+                  <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Ongkir</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Total</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Status</th>
                   <th scope="col" className="text-right px-4 py-3 font-semibold text-dark-700"><span className="sr-only">Actions</span></th>
@@ -147,6 +149,16 @@ export function AdminOrdersPage() {
                       {order.user?.name || order.userId || '-'}
                     </td>
                     <td className="px-4 py-3 text-dark-500">{formatDate(order.createdAt)}</td>
+                    <td className="px-4 py-3 text-dark-700 text-xs">
+                      {order.courierService || <span className="text-dark-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-dark-700">
+                      {(order.shippingFee ?? 0) > 0
+                        ? formatCurrency(order.shippingFee)
+                        : order.courierService
+                          ? <span className="text-green-600 text-xs font-medium">Free</span>
+                          : <span className="text-dark-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 font-medium text-dark-900">
                       {formatCurrency(order.total || order.totalAmount)}
                     </td>

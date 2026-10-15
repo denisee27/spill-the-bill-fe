@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Truck } from 'lucide-react';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { formatCurrency, formatDate, imageUrl } from '../../../shared/utils/format';
 import { ORDER_STATUS_BAR_COLOR } from '../../../shared/constants';
@@ -65,6 +65,17 @@ export function OrderCard({ order }) {
               {firstProductName}
               {extraCount > 0 && (
                 <span className="text-dark-400 font-normal"> +{extraCount} more</span>
+              )}
+            </p>
+          )}
+
+          {/* Courier */}
+          {order.courierService && (
+            <p className="text-xs text-dark-400 flex items-center gap-1 mt-0.5">
+              <Truck size={11} />
+              {order.courierService}
+              {(order.shippingFee ?? 0) > 0 && (
+                <span className="ml-0.5">· {formatCurrency(order.shippingFee)}</span>
               )}
             </p>
           )}

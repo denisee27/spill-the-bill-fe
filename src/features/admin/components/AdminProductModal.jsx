@@ -166,7 +166,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
     watch,
     formState: { errors, isSubmitting },
   } = useForm({
-    defaultValues: { variants: [], originId: '', eventId: '' },
+    defaultValues: { variants: [], originId: '', eventId: '', freeShipping: false },
   });
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
@@ -246,6 +246,7 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
       status: p.status || 'ACTIVE',
       originId: p.originId || '',
       eventId: p.eventProducts?.[0]?.eventId || '',
+      freeShipping: p.freeShipping ?? false,
     });
 
     setHasVariants(withVariants);
@@ -444,8 +445,8 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">Shipping Origin</label>
                 <select
-                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                  {...register('originId')}
+                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700" required
+                  {...register('originId', { required: 'Origin is required' })}
                 >
                   <option value="">No origin</option>
                   {origins.map((o) => <option key={o.id} value={o.id}>{o.label} — {o.city}</option>)}
@@ -478,7 +479,6 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
                 <RichTextEditor
                   value={watch('description') || ''}
                   onChange={(html) => setValue('description', html)}
-                  placeholder="Product description..."
                 />
               </div>
             </div>
@@ -509,6 +509,32 @@ export function AdminProductModal({ isOpen, onClose, productId }) {
                   <span className={clsx(
                     'absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200',
                     hasVariants ? 'left-6' : 'left-1'
+                  )} />
+                </div>
+              </div>
+
+              {/* Free Shipping toggle */}
+              <div className="flex items-center justify-between pb-4 border-b border-dark-100">
+                <div>
+                  <p className="text-sm font-semibold text-dark-800">Gratis Ongkir</p>
+                  <p className="text-xs text-dark-400 mt-0.5">
+                    {watch('freeShipping')
+                      ? 'Ongkos kirim ditanggung penjual — pembeli tidak perlu bayar ongkir.'
+                      : 'Pembeli menanggung biaya pengiriman.'}
+                  </p>
+                </div>
+                <div
+                  role="switch"
+                  aria-checked={!!watch('freeShipping')}
+                  onClick={() => setValue('freeShipping', !watch('freeShipping'))}
+                  className={clsx(
+                    'w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer',
+                    watch('freeShipping') ? 'bg-green-600' : 'bg-dark-200'
+                  )}
+                >
+                  <span className={clsx(
+                    'absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200',
+                    watch('freeShipping') ? 'left-6' : 'left-1'
                   )} />
                 </div>
               </div>

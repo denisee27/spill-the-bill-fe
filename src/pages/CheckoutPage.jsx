@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -13,6 +13,7 @@ import {
   getAddresses,
   createAddress,
   createOrder,
+  getOrder,
   uploadPaymentProof,
   cancelOrder,
   getShippingCost,
@@ -38,7 +39,7 @@ const STEPS = [
 export function CheckoutPage() {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const itemIds = searchParams.get('items')?.split(',').filter(Boolean) || [];
   const voucherCode = searchParams.get('voucher') || '';
 
@@ -47,9 +48,9 @@ export function CheckoutPage() {
   const [addAddressOpen, setAddAddressOpen] = useState(false);
   const [proofFiles, setProofFiles] = useState([]);
   const [createdOrder, setCreatedOrder] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(null);
+const [timeLeft, setTimeLeft] = useState(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const expiredRef = useRef(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [addrRegion, setAddrRegion] = useState({ province: null, regency: null, district: null, village: null });
 
@@ -93,6 +94,30 @@ export function CheckoutPage() {
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to add address'),
   });
 
+  // Restore in-progress order on page refresh
+  useEffect(() => {
+    const orderIdParam = searchParams.get('orderId');
+    const stepParam = parseInt(searchParams.get('step'));
+    if (!orderIdParam || !stepParam || stepParam <= CHECKOUT_STEPS.ADDRESS) return;
+
+    getOrder(orderIdParam)
+      .then((data) => {
+        const order = data?.data || data?.order || data;
+        if (!order) return;
+        if (order.status !== 'PENDING_PAYMENT') {
+          // Already past payment — go to order detail
+          navigate(`/orders/${order.id}`, { replace: true });
+          return;
+        }
+        setCreatedOrder(order);
+        setStep(stepParam);
+      })
+      .catch(() => {
+        // Order not found or error — stay on step 1
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const createOrderMutation = useMutation({
     mutationFn: createOrder,
     onSuccess: (data) => {
@@ -100,6 +125,13 @@ export function CheckoutPage() {
       setCreatedOrder(order);
       setStep(CHECKOUT_STEPS.PAYMENT);
       setConfirmModalOpen(false);
+      // Persist orderId + step in URL so refresh works
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('orderId', order.id);
+        next.set('step', CHECKOUT_STEPS.PAYMENT);
+        return next;
+      });
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to create order'),
   });
@@ -111,11 +143,14 @@ export function CheckoutPage() {
       return uploadPaymentProof(orderId, fd);
     },
     onSuccess: () => {
-      setSubmitted(true);
-      toast.success('Payment proof submitted!');
+      navigate(`/orders/${createdOrder?.id}`);
     },
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to upload proof'),
   });
+
+  // True if every selected item has freeShipping enabled
+  const allFreeShipping = selectedCartItems.length > 0 &&
+    selectedCartItems.every((item) => item?.product?.freeShipping === true);
 
   // Fetch shipping cost whenever address changes
   const fetchShipping = useCallback(async (addressId) => {
@@ -123,6 +158,15 @@ export function CheckoutPage() {
 
     const addr = addresses.find((a) => a.id === addressId);
     if (!addr?.city) return;
+
+    // All products have free shipping — skip API call
+    if (allFreeShipping) {
+      setShippingOptions([]);
+      setShippingError(null);
+      setShippingLoading(false);
+      setSelectedCourier(null);
+      return;
+    }
 
     // Try to get origin city from any cart item's product origin
     const originCity = selectedCartItems.reduce((found, item) => {
@@ -142,7 +186,6 @@ export function CheckoutPage() {
 
     try {
       const res = await getShippingCost({ originCity, destinationCity: addr.city, weight: 1000 });
-      // RajaOngkir V2: flat array [{ name, code, service, description, cost, etd }]
       const raw = res?.data ?? [];
       const options = raw
         .map((s) => ({
@@ -163,7 +206,7 @@ export function CheckoutPage() {
     } finally {
       setShippingLoading(false);
     }
-  }, [addresses, selectedCartItems]);
+  }, [addresses, selectedCartItems, allFreeShipping]);
 
   const handleAddressSelect = (id) => {
     setSelectedAddressId(id);
@@ -204,14 +247,18 @@ export function CheckoutPage() {
 
   useEffect(() => {
     if (!createdOrder || step !== CHECKOUT_STEPS.PAYMENT) return;
+    expiredRef.current = false;
     const expiryMs = createdOrder.expiresAt
       ? new Date(createdOrder.expiresAt).getTime()
-      : new Date(createdOrder.createdAt).getTime() + 5 * 60 * 1000;
+      : new Date(createdOrder.createdAt).getTime() + 30 * 60 * 1000;
 
     const interval = setInterval(() => {
       const left = Math.max(0, expiryMs - Date.now());
       setTimeLeft(left);
-      if (left === 0) navigate('/orders');
+      if (left === 0 && !expiredRef.current) {
+        expiredRef.current = true;
+        cancelOrder(createdOrder.id).catch(() => {}).finally(() => navigate('/orders'));
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [createdOrder, step, navigate]);
@@ -245,60 +292,6 @@ export function CheckoutPage() {
   const summaryDiscount = createdOrder?.discountAmount ?? 0;
   const summaryShipping = createdOrder?.shippingFee ?? (selectedCourier?.cost ?? 0);
   const summaryTotal = createdOrder?.total ?? Math.max(0, summarySubtotal - summaryDiscount + summaryShipping);
-
-  // ── Success screen ──
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-dark-50">
-        <Navbar user={user} cartCount={cartCount} onLogout={logout} />
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
-          <div
-            className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-sm animate-fade-up"
-            style={{ animationDelay: '0ms' }}
-          >
-            <CheckCircle size={48} className="text-green-600" strokeWidth={1.5} />
-          </div>
-          <h1
-            className="text-3xl font-black text-dark-900 mb-2 animate-fade-up"
-            style={{ animationDelay: '100ms' }}
-          >
-            Order Placed!
-          </h1>
-          <p
-            className="text-dark-500 mb-1 animate-fade-up"
-            style={{ animationDelay: '180ms' }}
-          >
-            Payment proof submitted successfully.
-          </p>
-          <p
-            className="text-dark-400 text-sm mb-8 animate-fade-up"
-            style={{ animationDelay: '240ms' }}
-          >
-            We&apos;ll verify your payment and notify you once it&apos;s approved.
-          </p>
-          {createdOrder?.id && (
-            <p
-              className="text-xs text-dark-400 mb-8 font-mono bg-dark-100 px-3 py-1.5 rounded-full animate-fade-up"
-              style={{ animationDelay: '300ms' }}
-            >
-              Order #{createdOrder.id.slice(0, 8).toUpperCase()}
-            </p>
-          )}
-          <div
-            className="flex gap-3 animate-fade-up"
-            style={{ animationDelay: '360ms' }}
-          >
-            <Button variant="primary" onClick={() => navigate('/orders')}>
-              View My Orders
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/home')}>
-              Continue Shopping
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-dark-50 animate-fade-up">
@@ -444,7 +437,18 @@ export function CheckoutPage() {
                     </div>
 
                     <div className="p-5">
-                      {shippingLoading ? (
+                      {allFreeShipping ? (
+                        <div className="flex items-center gap-3 py-3 px-4 bg-green-50 border border-green-200 rounded-xl">
+                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <Truck size={16} className="text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-green-800">Gratis Ongkir</p>
+                            <p className="text-xs text-green-600 mt-0.5">Semua produk dalam pesanan ini ditanggung penjual.</p>
+                          </div>
+                          <span className="ml-auto text-sm font-bold text-green-700">Rp 0</span>
+                        </div>
+                      ) : shippingLoading ? (
                         <div className="flex items-center gap-3 py-6 justify-center">
                           <LoadingSpinner size="sm" />
                           <span className="text-sm text-dark-500">Fetching shipping options...</span>
@@ -454,42 +458,57 @@ export function CheckoutPage() {
                       ) : shippingOptions.length === 0 ? (
                         <p className="text-sm text-dark-400 py-2">No shipping options available for this route.</p>
                       ) : (
-                        <div className="space-y-2">
-                          {shippingOptions.map((opt) => {
-                            const picked = selectedCourier?.key === opt.key;
-                            return (
-                              <button
-                                key={opt.key}
-                                onClick={() => setSelectedCourier(opt)}
-                                className={clsx(
-                                  'w-full text-left p-3.5 rounded-xl border-2 transition-all',
-                                  picked
-                                    ? 'border-brand-700 bg-brand-50'
-                                    : 'border-dark-200 hover:border-dark-300 hover:bg-dark-50'
-                                )}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className={clsx(
-                                      'w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
-                                      picked ? 'border-brand-700' : 'border-dark-400'
-                                    )}>
-                                      {picked && <div className="w-2 h-2 rounded-full bg-brand-700" />}
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-semibold text-dark-900">
-                                        {opt.courier} {opt.service}
+                        <div className="space-y-5">
+                          {Object.entries(
+                            shippingOptions.reduce((acc, opt) => {
+                              if (!acc[opt.courier]) acc[opt.courier] = [];
+                              acc[opt.courier].push(opt);
+                              return acc;
+                            }, {})
+                          ).map(([carrier, services]) => (
+                            <div key={carrier}>
+                              <p className="text-xs font-bold text-dark-400 uppercase tracking-widest mb-2">
+                                {carrier}
+                              </p>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {services.map((opt) => {
+                                  const picked = selectedCourier?.key === opt.key;
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      onClick={() => setSelectedCourier(opt)}
+                                      className={clsx(
+                                        'relative text-left p-3 rounded-xl border-2 transition-all',
+                                        picked
+                                          ? 'border-brand-700 bg-brand-50 shadow-sm'
+                                          : 'border-dark-200 hover:border-dark-300 hover:bg-dark-50'
+                                      )}
+                                    >
+                                      {picked && (
+                                        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-brand-700 flex items-center justify-center flex-shrink-0">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                        </div>
+                                      )}
+                                      <p className={clsx('text-xs font-black pr-5', picked ? 'text-brand-800' : 'text-dark-900')}>
+                                        {opt.service}
                                       </p>
-                                      <p className="text-xs text-dark-400">{opt.description}{opt.etd ? ` · ${opt.etd} days` : ''}</p>
-                                    </div>
-                                  </div>
-                                  <span className="text-sm font-bold text-dark-900 flex-shrink-0">
-                                    {formatCurrency(opt.cost)}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
+                                      {opt.description && (
+                                        <p className="text-[11px] text-dark-400 mt-0.5 leading-tight line-clamp-2">
+                                          {opt.description}
+                                        </p>
+                                      )}
+                                      <p className="text-sm font-bold text-brand-800 mt-2">
+                                        {formatCurrency(opt.cost)}
+                                      </p>
+                                      {opt.etd && (
+                                        <p className="text-[11px] text-dark-400 mt-0.5">{opt.etd} hari</p>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -590,7 +609,14 @@ export function CheckoutPage() {
                     variant="primary"
                     size="lg"
                     className="flex-1"
-                    onClick={() => setStep(CHECKOUT_STEPS.UPLOAD_PROOF)}
+                    onClick={() => {
+                      setStep(CHECKOUT_STEPS.UPLOAD_PROOF);
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.set('step', CHECKOUT_STEPS.UPLOAD_PROOF);
+                        return next;
+                      });
+                    }}
                   >
                     <Upload size={16} />
                     I&apos;ve paid — upload proof
@@ -710,7 +736,9 @@ export function CheckoutPage() {
                       {selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : 'Shipping'}
                     </span>
                     <span>
-                      {shippingLoading
+                      {allFreeShipping
+                        ? <span className="text-green-600 font-semibold">Gratis</span>
+                        : shippingLoading
                         ? '...'
                         : summaryShipping > 0
                         ? formatCurrency(summaryShipping)

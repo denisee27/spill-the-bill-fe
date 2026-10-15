@@ -100,7 +100,7 @@ export function FilterPanel({
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative ml-auto w-full max-w-sm bg-white h-full flex flex-col shadow-2xl animate-slide-up">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-100 flex-shrink-0">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={16} className="text-brand-800" />
             <h2 className="font-bold text-dark-900">Filter & Sort</h2>
@@ -110,7 +110,7 @@ export function FilterPanel({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        <div className="flex-1 overflow-y-auto min-h-0 p-5 space-y-6">
           {/* Sort */}
           <div>
             <h3 className="text-sm font-semibold text-dark-800 mb-3">Sort By</h3>
@@ -206,7 +206,7 @@ export function FilterPanel({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-dark-100 flex gap-3">
+        <div className="flex-shrink-0 px-5 py-4 border-t border-dark-100 flex gap-3">
           <Button variant="outline" className="flex-1" onClick={handleReset}>
             Reset
           </Button>

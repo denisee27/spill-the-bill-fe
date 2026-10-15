@@ -21,6 +21,13 @@ import { FilterPanel } from '../shared/components/FilterPanel';
 import { SEO } from '../shared/components/SEO';
 import clsx from 'clsx';
 
+const MAX_PRICE = 10000000;
+
+function parseCats(str) {
+  if (!str) return [];
+  return str.split(',').filter(Boolean);
+}
+
 export function HomePage() {
   const { types: productTypes } = useProductTypes();
   const TABS = [
@@ -34,23 +41,25 @@ export function HomePage() {
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [loginOpen, setLoginOpen] = useState(false);
   const [pendingProduct, setPendingProduct] = useState(null);
-  const [activeCategory, setActiveCategory] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [priceRange, setPriceRange] = useState([0, 10000000]);
-  const [sortBy, setSortBy] = useState('');
-  const [inStock, setInStock] = useState(false);
-  const [condition, setCondition] = useState('');
-  const MAX_PRICE = 10000000;
 
+  // All filter/tab state lives in URL — persists across navigation
   const tab = searchParams.get('tab') || TAB_VALUES.ALL;
+  const sortBy = searchParams.get('sort') || '';
+  const selectedCategories = parseCats(searchParams.get('cats'));
+  const minPrice = Number(searchParams.get('minP') || 0);
+  const maxPrice = Number(searchParams.get('maxP') || MAX_PRICE);
+  const priceRange = [minPrice, maxPrice];
+  const inStock = searchParams.get('inStock') === 'true';
+  const condition = searchParams.get('cond') || '';
+
   const debouncedSearch = useDebounce(search, 350);
   const isJastipTab = tab === TAB_VALUES.JASTIP;
 
   const hasActiveFilters =
     selectedCategories.length > 0 ||
-    priceRange[0] > 0 ||
-    priceRange[1] < MAX_PRICE ||
+    minPrice > 0 ||
+    maxPrice < MAX_PRICE ||
     !!sortBy ||
     inStock ||
     !!condition;
@@ -58,9 +67,9 @@ export function HomePage() {
   const filters = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(tab !== TAB_VALUES.ALL ? { type: tab.toUpperCase() } : {}),
-    ...(selectedCategories.length > 0 ? { categoryIds: selectedCategories.join(',') } : activeCategory ? { categoryId: activeCategory } : {}),
-    ...(priceRange[0] > 0 ? { minPrice: priceRange[0] } : {}),
-    ...(priceRange[1] < MAX_PRICE ? { maxPrice: priceRange[1] } : {}),
+    ...(selectedCategories.length > 0 ? { categoryIds: selectedCategories.join(',') } : {}),
+    ...(minPrice > 0 ? { minPrice } : {}),
+    ...(maxPrice < MAX_PRICE ? { maxPrice } : {}),
     ...(sortBy ? { sortBy } : {}),
     ...(inStock ? { inStock: true } : {}),
     ...(condition ? { condition } : {}),
@@ -69,8 +78,12 @@ export function HomePage() {
   const {
     data: productsData,
     isLoading: productsLoading,
+    isFetching: productsFetching,
     error: productsError,
-  } = useProducts(filters, { enabled: !isJastipTab });
+  } = useProducts(filters, {
+    enabled: !isJastipTab,
+    placeholderData: (prev) => prev,
+  });
 
   const {
     data: eventsData,
@@ -80,6 +93,7 @@ export function HomePage() {
     queryKey: ['events', { status: 'ACTIVE' }],
     queryFn: () => getEvents({ status: 'ACTIVE' }),
     enabled: isJastipTab,
+    placeholderData: (prev) => prev,
   });
 
   const { data: categoriesData } = useQuery({
@@ -95,6 +109,7 @@ export function HomePage() {
     : (categoriesData?.data?.categories ?? categoriesData?.categories ?? []);
 
   const isLoading = isJastipTab ? eventsLoading : productsLoading;
+  const isFetching = isJastipTab ? false : productsFetching;
   const error = isJastipTab ? eventsError : productsError;
 
   const { cartCount, addItem } = useCart({
@@ -102,25 +117,46 @@ export function HomePage() {
     onRequireAuth: () => setLoginOpen(true),
   });
 
+  // Merge updates into current params, dropping empty/default values
+  const buildParams = (overrides) => {
+    const next = { ...Object.fromEntries(searchParams.entries()), ...overrides };
+    if (!next.tab || next.tab === TAB_VALUES.ALL) delete next.tab;
+    if (!next.q) delete next.q;
+    if (!next.sort) delete next.sort;
+    if (!next.cats) delete next.cats;
+    if (!next.minP || next.minP === '0') delete next.minP;
+    if (!next.maxP || next.maxP === String(MAX_PRICE)) delete next.maxP;
+    if (!next.inStock || next.inStock === 'false') delete next.inStock;
+    if (!next.cond) delete next.cond;
+    return next;
+  };
+
   const handleTabChange = (newTab) => {
+    // Reset all filters on tab switch, keep search for non-jastip
     const params = {};
     if (newTab !== TAB_VALUES.ALL) params.tab = newTab;
     if (search && newTab !== TAB_VALUES.JASTIP) params.q = search;
     setSearchParams(params);
-    setActiveCategory(null);
-    setSelectedCategories([]);
-    setPriceRange([0, MAX_PRICE]);
-    setSortBy('');
-    setInStock(false);
-    setCondition('');
   };
 
   const handleSearchChange = (val) => {
     setSearch(val);
-    const params = {};
-    if (tab !== TAB_VALUES.ALL) params.tab = tab;
-    if (val) params.q = val;
-    setSearchParams(params);
+    setSearchParams(buildParams({ q: val }));
+  };
+
+  const handleFilterApply = ({ categories: cats, priceRange: pr, sortBy: sb, inStock: is, condition: cond }) => {
+    setSearchParams(buildParams({
+      cats: cats.length > 0 ? cats.join(',') : '',
+      minP: pr[0] > 0 ? String(pr[0]) : '',
+      maxP: pr[1] < MAX_PRICE ? String(pr[1]) : '',
+      sort: sb || '',
+      inStock: is ? 'true' : 'false',
+      cond: cond || '',
+    }));
+  };
+
+  const handleFilterReset = () => {
+    setSearchParams(buildParams({ cats: '', minP: '', maxP: '', sort: '', inStock: 'false', cond: '' }));
   };
 
   const handleAddToCart = (product) => {
@@ -224,7 +260,7 @@ export function HomePage() {
             </button>
             {hasActiveFilters && (
               <button
-                onClick={() => { setSelectedCategories([]); setPriceRange([0, MAX_PRICE]); setSortBy(''); setInStock(false); setCondition(''); }}
+                onClick={handleFilterReset}
                 className="text-xs text-dark-500 hover:text-dark-800 underline"
               >
                 Reset
@@ -243,14 +279,8 @@ export function HomePage() {
           sortBy={sortBy}
           inStock={inStock}
           condition={condition}
-          onApply={({ categories: cats, priceRange: pr, sortBy: sb, inStock: is, condition: cond }) => {
-            setSelectedCategories(cats);
-            setPriceRange(pr);
-            setSortBy(sb);
-            setInStock(is);
-            setCondition(cond);
-          }}
-          onReset={() => { setSelectedCategories([]); setPriceRange([0, MAX_PRICE]); setSortBy(''); setInStock(false); setCondition(''); }}
+          onApply={handleFilterApply}
+          onReset={handleFilterReset}
         />
 
         {/* Error state */}
@@ -287,7 +317,7 @@ export function HomePage() {
           )
         ) : (
           <>
-            {/* Results context */}
+            {/* Results context — show even while refetching */}
             {!isLoading && products.length > 0 && (
               <p className="text-sm text-dark-500 mb-4">
                 <strong className="text-dark-900">{products.length}</strong>{' '}
@@ -295,16 +325,24 @@ export function HomePage() {
                 {debouncedSearch ? (
                   <> for &ldquo;<strong className="text-dark-900">{debouncedSearch}</strong>&rdquo;</>
                 ) : null}
-                {activeCategory ? ' in this category' : ''}
               </p>
             )}
 
-            {/* Product grid */}
-            <ProductGrid
-              products={products}
-              isLoading={isLoading}
-              onAddToCart={handleAddToCart}
-            />
+            {/* Subtle fetching indicator — thin animated bar */}
+            {isFetching && !isLoading && (
+              <div className="h-0.5 w-full bg-dark-100 rounded-full mb-4 overflow-hidden">
+                <div className="h-full bg-brand-700 rounded-full animate-slide-progress" style={{ width: '40%' }} />
+              </div>
+            )}
+
+            {/* Product grid — fades slightly while refetching new results */}
+            <div className={clsx('transition-opacity duration-300', isFetching && !isLoading && 'opacity-50')}>
+              <ProductGrid
+                products={products}
+                isLoading={isLoading}
+                onAddToCart={handleAddToCart}
+              />
+            </div>
           </>
         )}
       </div>

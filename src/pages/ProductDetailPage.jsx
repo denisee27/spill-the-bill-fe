@@ -417,11 +417,7 @@ export function ProductDetailPage() {
         </div>
 
         {/* Reviews */}
-        <ReviewSection
-          productId={product.id}
-          isAuthenticated={isAuthenticated}
-          onRequireAuth={() => setLoginOpen(true)}
-        />
+        <ReviewSection productId={product.id} />
       </div>
 
       {/* Sticky bar — mobile */}

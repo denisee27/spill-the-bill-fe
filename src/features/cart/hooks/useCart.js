@@ -1,12 +1,19 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import * as cartService from '../services/cart.service';
 
-/**
- * Hook providing cart state and actions.
- * @param {{ isAuthenticated: boolean, onRequireAuth: () => void }} options
- */
+function patchItems(old, patcher) {
+  if (!old) return old;
+  if (old?.data?.items) {
+    return { ...old, data: { ...old.data, items: patcher(old.data.items) } };
+  }
+  if (old?.items) {
+    return { ...old, items: patcher(old.items) };
+  }
+  return old;
+}
+
 export function useCart({ isAuthenticated, onRequireAuth } = {}) {
   const queryClient = useQueryClient();
 
@@ -36,17 +43,39 @@ export function useCart({ isAuthenticated, onRequireAuth } = {}) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, quantity }) => cartService.updateCartItem(id, { quantity }),
-    onSuccess: invalidate,
-    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to update cart'),
+    onMutate: async ({ id, quantity }) => {
+      await queryClient.cancelQueries({ queryKey: ['cart'] });
+      const previous = queryClient.getQueryData(['cart']);
+      queryClient.setQueryData(['cart'], (old) =>
+        patchItems(old, (items) =>
+          items.map((item) => item.id === id ? { ...item, quantity } : item)
+        )
+      );
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['cart'], ctx.previous);
+      toast.error(err?.response?.data?.message || 'Failed to update cart');
+    },
+    onSettled: invalidate,
   });
 
   const removeMutation = useMutation({
     mutationFn: cartService.removeCartItem,
-    onSuccess: () => {
-      toast.success('Removed from cart');
-      invalidate();
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['cart'] });
+      const previous = queryClient.getQueryData(['cart']);
+      queryClient.setQueryData(['cart'], (old) =>
+        patchItems(old, (items) => items.filter((item) => item.id !== id))
+      );
+      return { previous };
     },
-    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to remove item'),
+    onError: (err, _id, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['cart'], ctx.previous);
+      toast.error(err?.response?.data?.message || 'Failed to remove item');
+    },
+    onSuccess: () => toast.success('Removed from cart'),
+    onSettled: invalidate,
   });
 
   const clearMutation = useMutation({
