@@ -26,7 +26,7 @@ export function RichTextEditor({ value, onChange, placeholder }) {
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
     editorProps: {
       attributes: {
-        class: 'outline-none min-h-[120px] px-3 py-2 text-sm prose prose-sm max-w-none',
+        class: 'outline-none min-h-[120px] px-3 py-2 text-sm prose prose-sm max-w-none [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0',
       },
     },
   });

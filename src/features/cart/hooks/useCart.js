@@ -26,7 +26,7 @@ export function useCart({ isAuthenticated, onRequireAuth } = {}) {
 
   const cartData = cart?.data ?? cart;
   const items = cartData?.items ?? [];
-  const cartCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  const cartCount = items.length;
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['cart'] });
 
@@ -36,8 +36,18 @@ export function useCart({ isAuthenticated, onRequireAuth } = {}) {
       toast.success('Added to cart!');
       invalidate();
     },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || 'Failed to add to cart');
+    onError: (err, vars) => {
+      const msg = err?.response?.data?.message || err?.response?.data?.error || '';
+      if (msg.toLowerCase().includes('stock')) {
+        const existing = items.find(
+          (i) => i.productId === vars.productId &&
+            (vars.variantId ? i.variantId === vars.variantId : !i.variantId)
+        );
+        const qty = existing?.quantity ?? 1;
+        toast(`Ada ${qty} produk ini di Keranjangmu. Kamu tidak bisa menambah lagi karena sudah melebihi jumlah stok Penjual.`, { icon: '🛒' });
+      } else {
+        toast.error(msg || 'Failed to add to cart');
+      }
     },
   });
 
@@ -55,7 +65,8 @@ export function useCart({ isAuthenticated, onRequireAuth } = {}) {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(['cart'], ctx.previous);
-      toast.error(err?.response?.data?.message || 'Failed to update cart');
+      const msg = err?.response?.data?.message || err?.response?.data?.error || '';
+      toast.error(msg || 'Failed to update cart');
     },
     onSettled: invalidate,
   });
@@ -89,17 +100,40 @@ export function useCart({ isAuthenticated, onRequireAuth } = {}) {
         onRequireAuth?.();
         return;
       }
+      const existing = items.find(
+        (item) => item.productId === params.productId &&
+          (params.variantId ? item.variantId === params.variantId : !item.variantId)
+      );
+      if (existing) {
+        const stock = params.variantId
+          ? (existing.variant?.stock ?? 0)
+          : (existing.product?.totalStock ?? existing.product?.stock ?? 0);
+        if (existing.quantity >= stock) {
+          toast(`Ada ${existing.quantity} produk ini di Keranjangmu. Kamu tidak bisa menambah lagi karena sudah melebihi jumlah stok Penjual.`, { icon: '🛒' });
+          return;
+        }
+      }
       addMutation.mutate(params);
     },
-    [isAuthenticated, onRequireAuth, addMutation]
+    [isAuthenticated, onRequireAuth, addMutation, items]
   );
 
   const updateQuantity = useCallback(
     (id, quantity) => {
       if (quantity < 1) return;
+      const item = items.find((i) => i.id === id);
+      if (item) {
+        const stock = item.variantId
+          ? (item.variant?.stock ?? item.product?.variants?.find((v) => v.id === item.variantId)?.stock ?? 0)
+          : (item.product?.stock ?? 0);
+        if (quantity > stock) {
+          toast(`Stok tersedia hanya ${stock}. Kamu tidak bisa menambah lebih dari jumlah stok Penjual.`, { icon: '🛒' });
+          return;
+        }
+      }
       updateMutation.mutate({ id, quantity });
     },
-    [updateMutation]
+    [updateMutation, items]
   );
 
   const removeItem = useCallback(

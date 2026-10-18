@@ -83,21 +83,21 @@ export function AdminMembersPage() {
               type="number"
               placeholder="500000"
               error={errors.minMonthlyAmount?.message}
-              {...register('minMonthlyAmount', { required: true, min: 0 })}
+              {...register('minMonthlyAmount', { required: true, min: 0, valueAsNumber: true })}
             />
             <Input
               label="Member Discount (%)"
               type="number"
               placeholder="10"
               error={errors.discountPercent?.message}
-              {...register('discountPercent', { required: true, min: 0, max: 100 })}
+              {...register('discountPercent', { required: true, min: 0, max: 100, valueAsNumber: true })}
             />
             <Input
               label="Membership Duration (Days)"
               type="number"
               placeholder="30"
               error={errors.renewalPeriodDays?.message}
-              {...register('renewalPeriodDays', { required: true, min: 1, max: 365 })}
+              {...register('renewalPeriodDays', { required: true, min: 1, max: 365, valueAsNumber: true })}
             />
             <div className="flex items-center gap-3">
               <input

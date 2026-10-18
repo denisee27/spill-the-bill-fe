@@ -3,7 +3,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { PriceCalculator } from './PriceCalculator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, ImagePlus, X, Camera, Image } from 'lucide-react';
+import { Plus, Trash2, ImagePlus, X, Camera, Image, ChevronDown } from 'lucide-react';
 import {
   getProductAdmin,
   createProduct,
@@ -60,7 +60,10 @@ function VariantRow({
 
           {/* Picker dropdown */}
           {isPickerOpen && (
-            <div className="absolute bottom-full mb-1 left-0 bg-white rounded-xl shadow-xl border border-dark-200 overflow-hidden z-30 w-40">
+            <div
+              className="absolute bottom-full mb-1 left-0 bg-white rounded-xl shadow-xl border border-dark-200 overflow-hidden z-30 w-40"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               <button
                 type="button"
                 onClick={onCameraClick}
@@ -379,6 +382,13 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
     saveMutation.mutate(fd);
   };
 
+  const onSubmitError = (errs) => {
+    const basicFields = ['name', 'type', 'originId'];
+    const pricingFields = ['price'];
+    if (basicFields.some((f) => errs[f])) setActiveTab(0);
+    else if (pricingFields.some((f) => errs[f])) setActiveTab(1);
+  };
+
   const TABS = ['Basic Info', 'Pricing & Stock', 'Media', ...(watchedType === 'JASTIP' ? ['Event'] : [])];
 
   return (
@@ -386,7 +396,7 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
       {(isEdit || isDuplicate) && productLoading ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onSubmitError)}>
           {/* Tab bar */}
           <div className="flex gap-1 border-b border-dark-200 -mx-6 px-6 mb-5 overflow-x-auto scrollbar-hide">
             {TABS.map((tab, i) => (
@@ -421,59 +431,80 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
                   <label className="block text-sm font-medium text-dark-700 mb-1">
                     Type <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                    {...register('type', { required: 'Type is required' })}
-                  >
-                    <option value="">Select type</option>
-                    {productTypes.map((t) => (
-                      <option key={t.id} value={t.slug}>{t.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                      {...register('type', { required: 'Type is required' })}
+                    >
+                      <option value="">Select type</option>
+                      {productTypes.map((t) => (
+                        <option key={t.id} value={t.slug}>{t.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+                  </div>
                   {errors.type && <p className="text-xs text-red-600 mt-1">{errors.type.message}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-1">Category</label>
-                  <select
-                    className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                    {...register('categoryId')}
-                  >
-                    <option value="">No category</option>
-                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select
+                      className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                      {...register('categoryId')}
+                    >
+                      <option value="">No category</option>
+                      {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+                  </div>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark-700 mb-1">Shipping Origin</label>
-                <select
-                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700" required
-                  {...register('originId', { required: 'Origin is required' })}
-                >
-                  <option value="">No origin</option>
-                  {origins.map((o) => <option key={o.id} value={o.id}>{o.label} — {o.city}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-dark-700 mb-1">
+                  Shipping Origin <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    className={clsx(
+                      'w-full appearance-none pl-3 pr-8 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer',
+                      errors.originId ? 'border-red-400 focus:ring-red-400' : 'border-dark-300'
+                    )}
+                    {...register('originId', { required: 'Shipping origin is required' })}
+                  >
+                    <option value="">Select origin</option>
+                    {origins.map((o) => <option key={o.id} value={o.id}>{o.label} — {o.city}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+                </div>
+                {errors.originId && <p className="text-xs text-red-600 mt-1">{errors.originId.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">Condition</label>
-                <select
-                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                  {...register('condition')}
-                >
-                  <option value="New">New</option>
-                  <option value="Good">Good</option>
-                  <option value="Well Used">Well Used</option>
-                </select>
+                <div className="relative">
+                  <select
+                    className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                    {...register('condition')}
+                  >
+                    <option value="New">New</option>
+                    <option value="Good">Good</option>
+                    <option value="Well Used">Well Used</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">Status</label>
-                <select
-                  className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                  {...register('status')}
-                >
-                  <option value="DRAFT">Draft</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                </select>
+                <div className="relative">
+                  <select
+                    className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                    {...register('status')}
+                  >
+                    <option value="DRAFT">Draft</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-1">Description</label>
@@ -664,13 +695,16 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
           {activeTab === 3 && watchedType === 'JASTIP' && (
             <div>
               <p className="text-xs text-dark-400 mb-3">Assign this Jastip product to an event</p>
-              <select
-                className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-                {...register('eventId')}
-              >
-                <option value="">No event</option>
-                {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
+              <div className="relative">
+                <select
+                  className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                  {...register('eventId')}
+                >
+                  <option value="">No event</option>
+                  {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
           )}
 

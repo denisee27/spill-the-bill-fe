@@ -3,38 +3,21 @@ import * as authService from '../../features/auth/services/auth.service';
 
 export const AuthContext = createContext(null);
 
-/**
- * Provides authentication state and actions to the entire app.
- */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // When admin login returns requires2fa, store tempToken here
+  const [pendingAdmin2fa, setPendingAdmin2fa] = useState(null);
 
-  // Validate token on mount
+  // On mount: validate session via cookie (no localStorage token needed)
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     authService
       .getMe()
       .then((data) => {
         const userData = data?.data || data?.user || data;
         setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
       })
       .catch(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
         setUser(null);
       })
       .finally(() => setIsLoading(false));
@@ -42,29 +25,38 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     const data = await authService.login(credentials);
-    const token = data?.token || data?.data?.token || data?.accessToken;
-    const userData = data?.user || data?.data?.user || data?.data;
+    const inner = data?.data ?? data;
 
-    if (token) {
-      localStorage.setItem('token', token);
+    // Admin 2FA: backend returns requires2fa + tempToken, no cookie set yet
+    if (inner?.requires2fa) {
+      setPendingAdmin2fa(inner.tempToken);
+      return { requires2fa: true };
     }
-    if (userData) {
-      localStorage.setItem('user', JSON.stringify(userData));
+
+    const userData = inner?.user ?? inner;
+    if (userData?.id) {
       setUser(userData);
     }
     return data;
   }, []);
 
+  const confirm2fa = useCallback(async (code) => {
+    if (!pendingAdmin2fa) throw new Error('No pending 2FA session');
+    const data = await authService.verifyAdmin2fa(pendingAdmin2fa, code);
+    const inner = data?.data ?? data;
+    const userData = inner?.user ?? inner;
+    if (userData?.id) {
+      setUser(userData);
+    }
+    setPendingAdmin2fa(null);
+    return data;
+  }, [pendingAdmin2fa]);
+
   const register = useCallback(async (formData) => {
     const data = await authService.register(formData);
-    const token = data?.token || data?.data?.token || data?.accessToken;
-    const userData = data?.user || data?.data?.user || data?.data;
-
-    if (token) {
-      localStorage.setItem('token', token);
-    }
-    if (userData) {
-      localStorage.setItem('user', JSON.stringify(userData));
+    const inner = data?.data ?? data;
+    const userData = inner?.user ?? inner;
+    if (userData?.id) {
       setUser(userData);
     }
     return data;
@@ -74,11 +66,10 @@ export function AuthProvider({ children }) {
     try {
       await authService.logout();
     } catch {
-      // ignore errors
+      // ignore
     } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
       setUser(null);
+      setPendingAdmin2fa(null);
     }
   }, []);
 
@@ -87,7 +78,9 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user),
     isAdmin: user?.role === 'ADMIN',
     isLoading,
+    pendingAdmin2fa: Boolean(pendingAdmin2fa),
     login,
+    confirm2fa,
     register,
     logout,
     setUser,

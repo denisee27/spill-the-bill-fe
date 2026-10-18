@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Plus, Edit, Trash2, History, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, History, ExternalLink, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../../shared/services/api';
 import Button from '../../../shared/components/Button';
@@ -209,13 +209,16 @@ export function AdminVouchersPage() {
           />
           <div>
             <label className="block text-sm font-medium text-dark-700 mb-1">Type <span className="text-red-500">*</span></label>
-            <select
-              className="w-full px-3 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700"
-              {...register('type', { required: true })}
-            >
-              <option value={VOUCHER_TYPE.PERCENTAGE}>Percentage (%)</option>
-              <option value={VOUCHER_TYPE.FIXED}>Fixed Amount (IDR)</option>
-            </select>
+            <div className="relative">
+              <select
+                className="w-full appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                {...register('type', { required: true })}
+              >
+                <option value={VOUCHER_TYPE.PERCENTAGE}>Percentage (%)</option>
+                <option value={VOUCHER_TYPE.FIXED}>Fixed Amount (IDR)</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+            </div>
           </div>
           <Input
             label={voucherType === VOUCHER_TYPE.PERCENTAGE ? 'Discount %' : 'Discount Amount (IDR)'}

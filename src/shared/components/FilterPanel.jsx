@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, SlidersHorizontal } from 'lucide-react';
+import { X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import Button from './Button';
@@ -114,15 +114,18 @@ export function FilterPanel({
           {/* Sort */}
           <div>
             <h3 className="text-sm font-semibold text-dark-800 mb-3">Sort By</h3>
-            <select
-              value={localSort}
-              onChange={(e) => setLocalSort(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-dark-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-700"
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={localSort}
+                onChange={(e) => setLocalSort(e.target.value)}
+                className="w-full appearance-none pl-3 pr-8 py-2 text-sm border border-dark-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+            </div>
           </div>
 
           {/* Price Range */}

@@ -409,14 +409,8 @@ const [timeLeft, setTimeLeft] = useState(null);
                                     <span className="font-semibold text-sm text-dark-900">
                                       {addr.label || 'Address'}
                                     </span>
-                                    {addr.isDefault && (
-                                      <span className="text-xs bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-medium">
-                                        Default
-                                      </span>
-                                    )}
                                   </div>
                                   <p className="text-sm text-dark-700 mt-0.5 font-medium">{addr.recipientName}</p>
-                                  <p className="text-xs text-dark-500 mt-0.5">{addr.phone}</p>
                                   <p className="text-xs text-dark-400 mt-0.5">
                                     {addr.street}, {addr.city}, {addr.province} {addr.postalCode}
                                   </p>
@@ -456,7 +450,16 @@ const [timeLeft, setTimeLeft] = useState(null);
                           <span className="text-sm text-dark-500">Fetching shipping options...</span>
                         </div>
                       ) : shippingError ? (
-                        <div className="text-sm text-dark-500 py-2">{shippingError}</div>
+                        <div className="flex flex-col items-start gap-2 py-2">
+                          <p className="text-sm text-red-600">{shippingError}</p>
+                          <button
+                            type="button"
+                            onClick={() => fetchShipping(selectedAddressId)}
+                            className="text-xs font-semibold text-brand-800 underline hover:text-brand-600"
+                          >
+                            Coba lagi
+                          </button>
+                        </div>
                       ) : shippingOptions.length === 0 ? (
                         <p className="text-sm text-dark-400 py-2">No shipping options available for this route.</p>
                       ) : (
@@ -888,7 +891,6 @@ const [timeLeft, setTimeLeft] = useState(null);
             createAddressMutation.mutate({
               label: d.label,
               recipientName: d.recipientName,
-              phone: d.phone,
               street: d.street,
               postalCode: d.postalCode || '',
               province: addrRegion.province?.name || '',
@@ -913,14 +915,6 @@ const [timeLeft, setTimeLeft] = useState(null);
             placeholder="Nama lengkap"
             error={errors.recipientName?.message}
             {...register('recipientName', { required: 'Nama penerima wajib diisi' })}
-          />
-          <Input
-            label="No. Telepon"
-            required
-            type="tel"
-            placeholder="08xxxxxxxxxx"
-            error={errors.phone?.message}
-            {...register('phone', { required: 'No. telepon wajib diisi' })}
           />
           <Input
             label="Alamat Lengkap"

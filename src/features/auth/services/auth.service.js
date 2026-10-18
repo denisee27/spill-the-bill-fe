@@ -37,7 +37,17 @@ export async function getMe() {
   return res.data;
 }
 
+export async function updateProfile({ phone }) {
+  const res = await api.patch('/auth/me', { phone });
+  return res.data;
+}
+
 export async function resetPassword({ email, otp, newPassword }) {
   const res = await api.post('/auth/reset-password', { email, otp, newPassword });
+  return res.data;
+}
+
+export async function verifyAdmin2fa(tempToken, code) {
+  const res = await api.post('/auth/admin/verify-2fa', { tempToken, code });
   return res.data;
 }

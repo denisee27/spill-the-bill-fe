@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ShoppingCart, MessageCircle, Minus, Plus, Zap, Play } from 'lucide-react';
@@ -295,8 +296,8 @@ export function ProductDetailPage() {
             {/* Description */}
             {product.description && (
               <div
-                className="prose prose-sm max-w-none text-dark-600"
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                className="prose prose-sm max-w-none text-dark-600 [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description) }}
               />
             )}
 

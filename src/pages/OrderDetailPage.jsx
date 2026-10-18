@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { ChevronLeft, UploadCloud, Clock, Eye, CheckCircle, Package, Truck, Check, XCircle, ImageOff } from 'lucide-react';
+import { ChevronLeft, ChevronDown, UploadCloud, Clock, Eye, CheckCircle, Package, Truck, Check, XCircle, ImageOff } from 'lucide-react';
 import { WriteReviewCard } from '../features/reviews/components/WriteReviewCard';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCart } from '../features/cart/hooks/useCart';
@@ -242,21 +242,19 @@ export function OrderDetailPage() {
 
                 {/* Countdown timer */}
                 {timeLeft !== null && (
-                  <div className={`rounded-xl border px-4 py-3 mb-4 flex items-center gap-3 ${
-                    timeLeft === 0
-                      ? 'bg-red-50 border-red-300'
-                      : timeLeft <= 60_000
+                  <div className={`rounded-xl border px-4 py-3 mb-4 flex items-center gap-3 ${timeLeft === 0
+                    ? 'bg-red-50 border-red-300'
+                    : timeLeft <= 60_000
                       ? 'bg-red-50 border-red-200'
                       : 'bg-amber-50 border-amber-200'
-                  }`}>
+                    }`}>
                     <Clock size={18} className={timeLeft <= 60_000 ? 'text-red-500' : 'text-amber-500'} />
                     <div className="flex-1">
                       <p className={`text-xs font-medium ${timeLeft <= 60_000 ? 'text-red-600' : 'text-amber-700'}`}>
                         {timeLeft === 0 ? 'Waktu pembayaran habis' : 'Selesaikan pembayaran dalam'}
                       </p>
-                      <p className={`font-mono font-black text-2xl tracking-widest mt-0.5 ${
-                        timeLeft === 0 ? 'text-red-700' : timeLeft <= 60_000 ? 'text-red-700' : 'text-amber-900'
-                      }`}>
+                      <p className={`font-mono font-black text-2xl tracking-widest mt-0.5 ${timeLeft === 0 ? 'text-red-700' : timeLeft <= 60_000 ? 'text-red-700' : 'text-amber-900'
+                        }`}>
                         {timeLeft === 0 ? '00:00:00' : formatCountdown(timeLeft)}
                       </p>
                     </div>
@@ -538,23 +536,29 @@ export function OrderDetailPage() {
                 <form onSubmit={handleSubmit((d) => refundDetailMutation.mutate(d))} className="space-y-3">
                   {refundMethod === 'BANK' ? (
                     <>
-                      <select {...register('bankName', { required: true })} className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm">
-                        <option value="">Select Bank</option>
-                        {['BCA', 'BNI', 'BRI', 'Mandiri', 'CIMB Niaga', 'BSI', 'Jenius/SMBC', 'Danamon', 'Permata'].map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select {...register('bankName', { required: true })} className="w-full appearance-none pl-3 pr-8 py-2 border border-amber-300 rounded-xl text-sm bg-white cursor-pointer">
+                          <option value="">Select Bank</option>
+                          {['BCA', 'BNI', 'BRI', 'Mandiri', 'CIMB Niaga', 'BSI', 'Jenius/SMBC', 'Danamon', 'Permata'].map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                      </div>
                       <input {...register('accountNumber', { required: true })} placeholder="Account Number" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
                       <input {...register('accountName', { required: true })} placeholder="Account Holder Name" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
                     </>
                   ) : (
                     <>
-                      <select {...register('ewalletPlatform', { required: true })} className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm">
-                        <option value="">Select E-Wallet</option>
-                        {['OVO', 'GoPay', 'DANA', 'ShopeePay', 'LinkAja'].map((e) => (
-                          <option key={e} value={e}>{e}</option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select {...register('ewalletPlatform', { required: true })} className="w-full appearance-none pl-3 pr-8 py-2 border border-amber-300 rounded-xl text-sm bg-white cursor-pointer">
+                          <option value="">Select E-Wallet</option>
+                          {['OVO', 'GoPay', 'DANA', 'ShopeePay', 'LinkAja'].map((e) => (
+                            <option key={e} value={e}>{e}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                      </div>
                       <input {...register('ewalletNumber', { required: true })} placeholder="E-Wallet Number" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
                     </>
                   )}

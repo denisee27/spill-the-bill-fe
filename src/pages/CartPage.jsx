@@ -150,7 +150,10 @@ export function CartPage() {
                 const product = item.product || item;
                 const rawImgs = typeof product?.images === 'string' ? (() => { try { return JSON.parse(product.images); } catch { return []; } })() : (product?.images || []);
                 const img = rawImgs?.[0]?.url || rawImgs?.[0];
-                const variantLabel = item.variant?.name || item.productVariant?.name;
+                const variantLabel = item.variant?.name
+                  || item.productVariant?.name
+                  || (item.variantId && item.product?.variants?.find((v) => v.id === item.variantId)?.name)
+                  || null;
 
                 return (
                   <div

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../features/auth/hooks/useAuth';
@@ -112,7 +113,7 @@ export function HomePage() {
   const isFetching = isJastipTab ? false : productsFetching;
   const error = isJastipTab ? eventsError : productsError;
 
-  const { cartCount, addItem } = useCart({
+  const { cartCount, addItem, items: cartItems } = useCart({
     isAuthenticated,
     onRequireAuth: () => setLoginOpen(true),
   });
@@ -164,6 +165,14 @@ export function HomePage() {
       setPendingProduct(product);
       setLoginOpen(true);
       return;
+    }
+    const existing = cartItems.find((i) => i.productId === product.id);
+    if (existing) {
+      const stock = product.totalStock ?? product.stock ?? 0;
+      if (existing.quantity >= stock) {
+        toast(`Ada ${existing.quantity} produk ini di Keranjangmu. Kamu tidak bisa menambah lagi karena sudah melebihi jumlah stok Penjual.`, { icon: '🛒' });
+        return;
+      }
     }
     addItem({ productId: product.id, quantity: 1 });
   };

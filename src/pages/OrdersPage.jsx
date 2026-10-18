@@ -83,10 +83,10 @@ export function OrdersPage() {
       : allOrders.length;
 
   return (
-    <div className="min-h-screen bg-dark-50 animate-fade-up">
+    <div className="min-h-screen bg-dark-50 animate-fade-up flex flex-col">
       <Navbar user={user} cartCount={cartCount} onLogout={logout} />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-2xl font-black text-dark-900 mb-5">My Orders</h1>
 
         {/* Tab bar */}

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { Eye, EyeOff, X, ArrowLeft, Loader2, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { sendOtp, resetPassword } from '../services/auth.service';
+import { Shield } from 'lucide-react';
 
 const USER_ROLE = Object.freeze({ ADMIN: 'ADMIN', USER: 'USER' });
 
@@ -119,9 +120,9 @@ function ResendButton({ countdown, sending, onResend }) {
 // ─── LoginModal ─────────────────────────────────────────────────────────────────
 export function LoginModal({ isOpen, onClose, onSuccess }) {
   const navigate = useNavigate();
-  const { login, register: registerUser } = useAuth();
+  const { login, register: registerUser, confirm2fa } = useAuth();
 
-  // 'login' | 'register' | 'forgot'
+  // 'login' | 'register' | 'forgot' | '2fa'
   const [tab, setTab] = useState('login');
   // register: 1 = form, 2 = otp
   const [registerStep, setRegisterStep] = useState(1);
@@ -160,6 +161,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
     setOtpValues(['', '', '', '', '', '']);
     setResendCountdown(0);
     setOtpEmail('');
+    setTwoFactorCode('');
     loginForm.reset();
     registerForm.reset();
     forgotForm.reset();
@@ -283,10 +285,16 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
   };
 
   // ── Login flow ───────────────────────────────────────────────────────────────
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+
   const handleLoginSubmit = async (formData) => {
     setServerError('');
     try {
       const result = await login({ email: formData.email, password: formData.password });
+      if (result?.requires2fa) {
+        setTab('2fa');
+        return;
+      }
       const role = result?.data?.user?.role ?? result?.user?.role;
       loginForm.reset();
       onClose?.();
@@ -294,6 +302,18 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
       onSuccess?.();
     } catch (err) {
       setServerError(err?.response?.data?.error || err?.response?.data?.message || 'Incorrect email or password.');
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e) => {
+    e.preventDefault();
+    setServerError('');
+    try {
+      await confirm2fa(twoFactorCode.trim());
+      onClose?.();
+      navigate('/admin/dashboard');
+    } catch (err) {
+      setServerError(err?.response?.data?.error || err?.response?.data?.message || 'Invalid 2FA code.');
     }
   };
 
@@ -351,6 +371,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
 
   // ── Heading ──────────────────────────────────────────────────────────────────
   const headingText = () => {
+    if (tab === '2fa') return 'Admin Verification';
     if (tab === 'login') return 'Welcome back';
     if (tab === 'forgot') {
       if (forgotStep === 1) return 'Reset your password';
@@ -373,7 +394,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
     return null;
   };
 
-  const showTabSwitcher = tab !== 'forgot' && !(tab === 'register' && registerStep === 2);
+  const showTabSwitcher = tab !== 'forgot' && tab !== '2fa' && !(tab === 'register' && registerStep === 2);
 
   return createPortal(
     <div
@@ -717,6 +738,50 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
                 Back to Login
               </PrimaryButton>
             </div>
+          )}
+
+          {/* ── ADMIN 2FA ────────────────────────────────────────────────────── */}
+          {tab === '2fa' && (
+            <form onSubmit={handleTwoFactorSubmit} className="space-y-5">
+              <div className="flex flex-col items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                  <Shield size={22} className="text-red-800" />
+                </div>
+                <p className="text-sm text-gray-500 text-center">
+                  Enter the admin verification code configured in your server environment.
+                </p>
+              </div>
+
+              <Field label="Verification Code">
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  className={inputCls}
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  autoFocus
+                />
+              </Field>
+
+              {serverError && (
+                <p className="text-xs text-red-600 flex items-center justify-center gap-1">
+                  <span className="inline-block w-1 h-1 rounded-full bg-red-500 flex-shrink-0" />
+                  {serverError}
+                </p>
+              )}
+
+              <PrimaryButton type="submit" disabled={!twoFactorCode.trim()}>
+                Verify
+              </PrimaryButton>
+
+              <button
+                type="button"
+                onClick={() => { setTab('login'); setServerError(''); setTwoFactorCode(''); }}
+                className="flex items-center justify-center gap-1 w-full text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <ArrowLeft size={13} /> Back to Login
+              </button>
+            </form>
           )}
         </div>
       </div>

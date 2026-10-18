@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { CheckCircle, Play } from 'lucide-react';
+import { Play, CheckCircle } from 'lucide-react';
 import { getMyReviewForProduct, submitReview } from '../services/review.service';
 import { StarRating } from './ReviewSection';
 import Button from '../../../shared/components/Button';
@@ -15,7 +15,9 @@ function ReviewMediaGrid({ media }) {
       {media.map((url, i) => {
         const isVideo = /\.(mp4|mov|webm|avi)$/i.test(url);
         return (
-          <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden bg-dark-100 flex-shrink-0">
+          <a key={i} href={imageUrl(url)} target="_blank" rel="noopener noreferrer"
+            className="relative w-16 h-16 rounded-lg overflow-hidden bg-dark-100 flex-shrink-0 block hover:opacity-90 transition-opacity"
+          >
             {isVideo ? (
               <>
                 <video src={imageUrl(url)} className="w-full h-full object-cover" muted playsInline preload="metadata" />
@@ -26,7 +28,7 @@ function ReviewMediaGrid({ media }) {
             ) : (
               <img src={imageUrl(url)} alt="" className="w-full h-full object-cover" />
             )}
-          </div>
+          </a>
         );
       })}
     </div>
@@ -48,11 +50,11 @@ export function WriteReviewCard({ productId, productName, productImage }) {
   const { mutate, isPending } = useMutation({
     mutationFn: () => submitReview(productId, { rating, comment, mediaFiles }),
     onSuccess: () => {
-      toast.success('Review submitted!');
+      toast.success('Review berhasil dikirim!');
       queryClient.invalidateQueries({ queryKey: ['my-review', productId] });
       queryClient.invalidateQueries({ queryKey: ['reviews', productId] });
     },
-    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to submit review'),
+    onError: (err) => toast.error(err?.response?.data?.message || 'Gagal mengirim review'),
   });
 
   if (isLoading) return null;
@@ -77,16 +79,16 @@ export function WriteReviewCard({ productId, productName, productImage }) {
         <p className="text-sm font-semibold text-dark-900 mb-2 truncate">{productName}</p>
 
         {existing ? (
-          <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 rounded-xl p-3">
-            <CheckCircle size={16} className="mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold">Review submitted</p>
-              <StarRating value={existing.rating} size={13} />
-              {existing.comment && (
-                <p className="text-dark-600 mt-1 text-xs leading-relaxed">{existing.comment}</p>
-              )}
-              <ReviewMediaGrid media={existingMedia} />
+          <div className="bg-dark-50 rounded-xl p-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <CheckCircle size={14} className="text-green-600 flex-shrink-0" />
+              <span className="text-xs font-semibold text-green-700">Ulasanmu</span>
             </div>
+            <StarRating value={existing.rating} size={13} />
+            {existing.comment && (
+              <p className="text-xs text-dark-600 leading-relaxed">{existing.comment}</p>
+            )}
+            <ReviewMediaGrid media={existingMedia} />
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -94,7 +96,7 @@ export function WriteReviewCard({ productId, productName, productImage }) {
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Share your experience (optional)"
+              placeholder="Ceritakan pengalamanmu (opsional)"
               rows={2}
               className="w-full px-3 py-2 text-sm border border-dark-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-700 resize-none"
             />
@@ -105,7 +107,7 @@ export function WriteReviewCard({ productId, productName, productImage }) {
               disabled={rating === 0 || isPending}
               onClick={() => mutate()}
             >
-              {isPending ? 'Uploading...' : 'Submit Review'}
+              {isPending ? 'Mengirim...' : 'Kirim Ulasan'}
             </Button>
           </div>
         )}

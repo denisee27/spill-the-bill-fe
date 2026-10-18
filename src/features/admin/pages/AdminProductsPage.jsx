@@ -188,15 +188,18 @@ export function AdminProductsPage() {
           />
         </div>
 
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-3 py-2 border border-dark-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="appearance-none pl-3 pr-8 py-2 border border-dark-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+        </div>
 
         <button
           onClick={() => setFiltersOpen((v) => !v)}
@@ -232,81 +235,99 @@ export function AdminProductsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                <option value="">All Types</option>
-                {productTypes.map((t) => (
-                  <option key={t.id} value={t.slug}>{t.name}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  <option value="">All Types</option>
+                  {productTypes.map((t) => (
+                    <option key={t.id} value={t.slug}>{t.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Status</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                {STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Category</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Condition</label>
-              <select
-                value={filterCondition}
-                onChange={(e) => setFilterCondition(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                {CONDITION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filterCondition}
+                  onChange={(e) => setFilterCondition(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  {CONDITION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Featured</label>
-              <select
-                value={filterFeatured}
-                onChange={(e) => setFilterFeatured(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                <option value="">All</option>
-                <option value="true">Featured</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={filterFeatured}
+                  onChange={(e) => setFilterFeatured(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  <option value="">All</option>
+                  <option value="true">Featured</option>
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-dark-600 mb-1">Stock</label>
-              <select
-                value={filterSoldOut}
-                onChange={(e) => setFilterSoldOut(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white"
-              >
-                <option value="">All</option>
-                <option value="false">Available</option>
-                <option value="true">Sold Out</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={filterSoldOut}
+                  onChange={(e) => setFilterSoldOut(e.target.value)}
+                  className="w-full appearance-none pl-2.5 pr-7 py-1.5 border border-dark-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-700 bg-white cursor-pointer"
+                >
+                  <option value="">All</option>
+                  <option value="false">Available</option>
+                  <option value="true">Sold Out</option>
+                </select>
+                <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -388,7 +409,12 @@ export function AdminProductsPage() {
                       <td className="px-4 py-3 font-medium text-dark-900">{formatCurrency(p.price)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {editingStockId === p.id ? (
+                          {p.variants?.length > 0 ? (
+                            <span className="text-dark-600" title="Total stok dari semua varian">
+                              {p.stock ?? 0}
+                              <span className="ml-1 text-xs text-dark-400">({p.variants.length} var)</span>
+                            </span>
+                          ) : editingStockId === p.id ? (
                             <input
                               type="number"
                               value={editingStockValue}

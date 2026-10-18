@@ -31,12 +31,13 @@ import Button from '../shared/components/Button';
 import { WilayahSelect } from '../shared/components/WilayahSelect';
 import { formatCurrency, formatDate, imageUrl } from '../shared/utils/format';
 import api from '../shared/services/api';
+import { updateProfile } from '../features/auth/services/auth.service';
 import { Footer } from '../shared/components/Footer';
 import {
   getAddresses,
   createAddress,
   updateAddress,
-  setDefaultAddress,
+
   deleteAddress,
 } from '../features/orders/services/order.service';
 import { getMyFavorites } from '../features/favorites/services/favorite.service';
@@ -49,14 +50,17 @@ async function getMemberProgress() {
 const ADDRESS_TOP_FIELDS = [
   { name: 'label', label: 'Label', placeholder: 'Home, Office, etc.' },
   { name: 'recipientName', label: 'Recipient Name', placeholder: 'Full recipient name' },
-  { name: 'phone', label: 'Phone Number', placeholder: '08xxxxxxxxxx' },
   { name: 'street', label: 'Street Address', placeholder: 'Street name, number, etc.', full: true },
 ];
 
 export function ProfilePage() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, setUser } = useAuth();
   const [addressModal, setAddressModal] = useState(null); // null | 'add' | address object
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [wilayahKey, setWilayahKey] = useState(0);
+  const [addrRegionCodes, setAddrRegionCodes] = useState({});
   const queryClient = useQueryClient();
 
   const { cartCount } = useCart({ isAuthenticated });
@@ -99,20 +103,43 @@ export function ProfilePage() {
     onError: () => toast.error('Failed to save address'),
   });
 
-  const defaultMutation = useMutation({
-    mutationFn: setDefaultAddress,
-    onSuccess: () => { toast.success('Default address changed'); invalidateAddresses(); },
-    onError: () => toast.error('Failed to change default address'),
-  });
-
   const deleteMutation = useMutation({
     mutationFn: deleteAddress,
     onSuccess: () => { toast.success('Address deleted'); invalidateAddresses(); setDeleteConfirm(null); },
     onError: () => toast.error('Failed to delete address'),
   });
 
-  const openAdd = () => { reset({}); setAddressModal('add'); };
-  const openEdit = (addr) => { reset(addr); setAddressModal(addr); };
+  const phoneMutation = useMutation({
+    mutationFn: (phone) => updateProfile({ phone }),
+    onSuccess: (data) => {
+      const updated = data?.data ?? data;
+      const newUser = { ...user, phone: updated.phone };
+      setUser(newUser);
+      localStorage.setItem('user', JSON.stringify(newUser));
+      toast.success('Nomor HP berhasil diperbarui');
+      setEditingPhone(false);
+    },
+    onError: () => toast.error('Gagal memperbarui nomor HP'),
+  });
+
+  const openAdd = () => {
+    reset({});
+    setAddrRegionCodes({});
+    setWilayahKey((k) => k + 1);
+    setAddressModal('add');
+  };
+
+  const openEdit = (addr) => {
+    reset(addr);
+    setAddrRegionCodes({
+      provinceCode: addr.provinceCode ?? null,
+      regencyCode: addr.regencyCode ?? null,
+      districtCode: addr.districtCode ?? null,
+      villageCode: addr.villageCode ?? null,
+    });
+    setWilayahKey((k) => k + 1);
+    setAddressModal(addr);
+  };
 
   const progress = data?.data ?? {};
 
@@ -159,12 +186,44 @@ export function ProfilePage() {
                     <span className="truncate">{user.email}</span>
                   </div>
                 )}
-                {user?.phone && (
-                  <div className="flex items-center gap-2 text-sm text-dark-600">
-                    <Phone size={13} className="text-dark-400 flex-shrink-0" />
-                    <span>{user.phone}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-sm text-dark-600">
+                  <Phone size={13} className="text-dark-400 flex-shrink-0" />
+                  {editingPhone ? (
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        type="tel"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        placeholder="08xxxxxxxxxx"
+                        autoFocus
+                        className="flex-1 px-2 py-0.5 text-sm border border-dark-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-700 min-w-0"
+                      />
+                      <button
+                        onClick={() => phoneMutation.mutate(phoneInput)}
+                        disabled={phoneMutation.isPending}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Check size={14} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        onClick={() => setEditingPhone(false)}
+                        className="p-1 text-dark-400 hover:bg-dark-100 rounded-lg transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span>{user?.phone || <span className="text-dark-400 italic">Belum diisi</span>}</span>
+                      <button
+                        onClick={() => { setPhoneInput(user?.phone || ''); setEditingPhone(true); }}
+                        className="p-0.5 text-dark-300 hover:text-brand-700 rounded transition-colors"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {user?.createdAt && (
                   <div className="flex items-center gap-2 text-sm text-dark-500">
                     <Calendar size={13} className="text-dark-400 flex-shrink-0" />
@@ -415,24 +474,12 @@ export function ProfilePage() {
               <div className="divide-y divide-dark-100">
                 {addresses.map((addr) => (
                   <div key={addr.id} className="px-5 py-4 flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 cursor-pointer ${addr.isDefault ? 'border-brand-800 bg-brand-800' : 'border-dark-300'}`}
-                        onClick={() => !addr.isDefault && defaultMutation.mutate(addr.id)}
-                      >
-                        {addr.isDefault && <Check size={10} className="text-white" strokeWidth={3} />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-dark-900">{addr.label}</span>
-                          {addr.isDefault && (
-                            <span className="text-xs bg-brand-100 text-brand-800 px-1.5 py-0.5 rounded-md font-medium">Default</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-dark-700 mt-0.5">{addr.recipientName} · {addr.phone}</p>
-                        <p className="text-xs text-dark-500 mt-0.5">
-                          {addr.street}, {addr.city}, {addr.province} {addr.postalCode}
-                        </p>
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-sm text-dark-900">{addr.label}</span>
+                      <p className="text-sm text-dark-700 mt-0.5">{addr.recipientName}{user?.phone ? ` · ${user.phone}` : ''}</p>
+                      <p className="text-xs text-dark-500 mt-0.5">
+                        {addr.street}, {addr.city}, {addr.province} {addr.postalCode}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => openEdit(addr)} className="p-1.5 text-dark-400 hover:text-brand-700 rounded-lg hover:bg-brand-50 transition-colors">
@@ -457,7 +504,12 @@ export function ProfilePage() {
         title={addressModal?.id ? 'Edit Address' : 'Add Address'}
         size="md"
       >
-        <form onSubmit={handleSubmit((v) => saveMutation.mutate(v))} className="space-y-3">
+        <form
+          onSubmit={handleSubmit((v) =>
+            saveMutation.mutate({ ...v, ...addrRegionCodes })
+          )}
+          className="space-y-3"
+        >
           <div className="grid grid-cols-2 gap-3">
             {ADDRESS_TOP_FIELDS.map(({ name, label, placeholder, full }) => (
               <div key={name} className={full ? 'col-span-2' : ''}>
@@ -472,9 +524,18 @@ export function ProfilePage() {
             ))}
           </div>
           <WilayahSelect
-            onChange={({ province, regency }) => {
-              if (province) setValue('province', province.name);
-              if (regency) setValue('city', regency.name);
+            key={wilayahKey}
+            initialValue={addressModal?.id ? {
+              provinceId: addressModal.provinceCode,
+              regencyId: addressModal.regencyCode,
+              districtId: addressModal.districtCode,
+              villageId: addressModal.villageCode,
+            } : undefined}
+            onChange={({ province, regency, district, village }) => {
+              if (province) { setValue('province', province.name); setAddrRegionCodes((c) => ({ ...c, provinceCode: province.id })); }
+              if (regency) { setValue('city', regency.name); setAddrRegionCodes((c) => ({ ...c, regencyCode: regency.id })); }
+              if (district) setAddrRegionCodes((c) => ({ ...c, districtCode: district.id }));
+              if (village) setAddrRegionCodes((c) => ({ ...c, villageCode: village.id }));
             }}
             showVillage={false}
           />
