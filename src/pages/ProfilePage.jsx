@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import {
   User,
   Star,
-  Gift,
   Truck,
   Calendar,
   TrendingUp,
@@ -41,11 +40,7 @@ import {
   deleteAddress,
 } from '../features/orders/services/order.service';
 import { getMyFavorites } from '../features/favorites/services/favorite.service';
-
-async function getMemberProgress() {
-  const res = await api.get('/members/my-progress');
-  return res.data;
-}
+import { getMemberProgress } from '../features/members/hooks/useMemberProgress';
 
 const ADDRESS_TOP_FIELDS = [
   { name: 'label', label: 'Label', placeholder: 'Home, Office, etc.' },
@@ -263,9 +258,7 @@ export function ProfilePage() {
                 <Star size={15} className="text-brand-300" fill="currentColor" aria-hidden="true" />
                 <span className="text-white font-black text-xs tracking-widest uppercase">Active Member</span>
               </div>
-              <p className="text-white/40 text-[10px] uppercase tracking-widest mb-0.5">Name</p>
-              <p className="text-white font-black text-2xl leading-tight">{user?.name || '-'}</p>
-              <div className="grid grid-cols-3 gap-4 mt-5">
+              <div className="grid grid-cols-3 gap-4">
                 {progress.memberSince && (
                   <div>
                     <p className="text-white/40 text-[10px] uppercase tracking-wide mb-0.5">Since</p>
@@ -289,76 +282,121 @@ export function ProfilePage() {
           </div>
         ) : (
           /* Non-member Progress Card */
-          <div className="bg-dark-900 rounded-2xl overflow-hidden p-6">
-            <p className="text-white font-black text-xl mb-1">Unlock Member</p>
-            <p className="text-dark-400 text-xs mb-5">Keep shopping to unlock member status</p>
-            <div className="space-y-2 mb-5">
-              <div className="flex justify-between text-xs">
-                <span className="text-dark-400 font-medium">This month's spending</span>
-                <span className="text-white font-bold">
-                  {formatCurrency(progress.currentSpend ?? 0)} / {formatCurrency(progress.minMonthlyAmount ?? 0)}
+          <div
+            className="rounded-2xl overflow-hidden relative"
+            style={{ background: 'linear-gradient(135deg, #374151 0%, #1f2937 60%, #111827 100%)' }}
+          >
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+                backgroundSize: '16px 16px',
+                opacity: 0.03,
+              }}
+            />
+            <div className="relative z-10 p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-white font-black text-xl">Jadi Member</p>
+                <span className="text-xs font-bold text-dark-300 bg-white/10 px-2.5 py-1 rounded-full">
+                  Belum aktif
                 </span>
               </div>
-              <div className="w-full bg-dark-700 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 rounded-full transition-all duration-700 bg-gradient-to-r from-brand-500 to-brand-700"
-                  style={{ width: `${Math.min(progress.progressPercent ?? 0, 100)}%` }}
-                />
-              </div>
-              <p className="text-brand-400 text-xs font-semibold">
-                {formatCurrency(
-                  Math.max((progress.minMonthlyAmount ?? 0) - (progress.currentSpend ?? 0), 0)
-                )}{' '}
-                more to unlock member status!
+              <p className="text-white/50 text-xs mb-5">
+                Kumpulkan belanja {formatCurrency(progress.minMonthlyAmount ?? 0)} dalam periode ini untuk unlock membership
               </p>
-            </div>
-            <div className="space-y-2">
-              {(progress.discountPercent ?? 0) > 0 && (
-                <div className="flex items-center gap-2 text-xs text-dark-400">
-                  <Gift size={13} className="text-brand-500 flex-shrink-0" />
-                  <span>{progress.discountPercent}% discount on all orders</span>
+
+              {/* Progress */}
+              <div className="space-y-2 mb-5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/50">Total belanja periode ini</span>
+                  <span className="text-white font-bold">
+                    {formatCurrency(progress.currentSpend ?? 0)}
+                    <span className="text-white/40 font-normal"> / {formatCurrency(progress.minMonthlyAmount ?? 0)}</span>
+                  </span>
                 </div>
-              )}
-              <div className="flex items-center gap-2 text-xs text-dark-400">
-                <Truck size={13} className="text-brand-500 flex-shrink-0" />
-                <span>Free shipping on every order</span>
+                <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-2.5 rounded-full transition-all duration-700 bg-gradient-to-r from-brand-500 to-brand-800"
+                    style={{ width: `${Math.min(progress.progressPercent ?? 0, 100)}%` }}
+                  />
+                </div>
+                <p className="text-brand-400 text-xs font-semibold">
+                  {formatCurrency(progress.remaining ?? 0)} lagi untuk jadi Member
+                </p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-dark-400">
-                <Star size={13} className="text-brand-500 flex-shrink-0" />
-                <span>Exclusive member badge on your profile</span>
+
+              {/* Duration info */}
+              <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calendar size={13} className="text-brand-400 flex-shrink-0" />
+                  <p className="text-white/60 text-xs">
+                    Membership aktif selama{' '}
+                    <span className="text-white font-bold">{progress.renewalPeriodDays ?? 180} hari</span>
+                    {' '}setelah kamu memenuhi syarat
+                  </p>
+                </div>
+                {progress.daysLeftInWindow != null && (
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={13} className="text-brand-400 flex-shrink-0" />
+                    <p className="text-white/60 text-xs">
+                      Sisa waktu periode ini:{' '}
+                      <span className={`font-bold ${progress.daysLeftInWindow <= 14 ? 'text-red-400' : 'text-white'}`}>
+                        {progress.daysLeftInWindow} hari
+                      </span>
+                      {progress.daysLeftInWindow <= 14 && (
+                        <span className="text-red-400"> — segera belanja!</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Benefits */}
+              <p className="text-white/40 text-[10px] uppercase tracking-widest mb-3">Yang kamu dapat</p>
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-brand-800/30 flex items-center justify-center flex-shrink-0">
+                    <Truck size={13} className="text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold">Gratis Ongkir</p>
+                    <p className="text-white/40 text-[11px]">Tidak ada biaya pengiriman di setiap pesanan</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-brand-800/30 flex items-center justify-center flex-shrink-0">
+                    <Star size={13} className="text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="text-white text-xs font-semibold">Member Badge</p>
+                    <p className="text-white/40 text-[11px]">Badge eksklusif yang tampil di profil kamu</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Benefits Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-dark-200 p-5 text-center">
-            <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Gift size={20} className="text-brand-800" />
+        {/* Benefits Grid — only for active members */}
+        {progress?.isMember && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-dark-200 p-5 text-center">
+              <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Truck size={20} className="text-brand-800" />
+              </div>
+              <p className="font-bold text-dark-900 text-sm">Gratis Ongkir</p>
+              <p className="text-xs text-dark-500 mt-1">Tidak ada biaya pengiriman untuk member</p>
             </div>
-            <p className="font-bold text-dark-900 text-sm">
-              {(progress.discountPercent ?? 0) > 0
-                ? `${progress.discountPercent}% Discount`
-                : 'Member Discount'}
-            </p>
-            <p className="text-xs text-dark-500 mt-1">On every order you place</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-dark-200 p-5 text-center">
-            <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Truck size={20} className="text-brand-800" />
+            <div className="bg-white rounded-2xl border border-dark-200 p-5 text-center">
+              <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Star size={20} className="text-brand-800" />
+              </div>
+              <p className="font-bold text-dark-900 text-sm">Member Badge</p>
+              <p className="text-xs text-dark-500 mt-1">Badge eksklusif di profil kamu</p>
             </div>
-            <p className="font-bold text-dark-900 text-sm">Free Shipping</p>
-            <p className="text-xs text-dark-500 mt-1">No delivery fees for members</p>
           </div>
-          <div className="bg-white rounded-2xl border border-dark-200 p-5 text-center">
-            <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Star size={20} className="text-brand-800" />
-            </div>
-            <p className="font-bold text-dark-900 text-sm">Member Badge</p>
-            <p className="text-xs text-dark-500 mt-1">Show off your member status</p>
-          </div>
-        </div>
+        )}
 
         {/* Quick Links */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

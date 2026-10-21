@@ -4,11 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
-  CheckCircle, MapPin, Plus, QrCode, Upload,
+  CheckCircle, MapPin, Plus, QrCode, Download,
   ChevronRight, Package, Tag, Copy, Clock, Truck,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { useCart } from '../features/cart/hooks/useCart';
+import { useMemberProgress } from '../features/members/hooks/useMemberProgress';
 import {
   getAddresses,
   createAddress,
@@ -22,6 +23,7 @@ import { Navbar } from '../shared/components/Navbar';
 import Button from '../shared/components/Button';
 import Input from '../shared/components/Input';
 import Modal from '../shared/components/Modal';
+import { ConfirmModal } from '../shared/components/ConfirmModal';
 import ImageUpload from '../shared/components/ImageUpload';
 import LoadingSpinner from '../shared/components/LoadingSpinner';
 import { WilayahSelect } from '../shared/components/WilayahSelect';
@@ -33,7 +35,6 @@ import clsx from 'clsx';
 const STEPS = [
   { id: CHECKOUT_STEPS.ADDRESS, label: 'Address', icon: MapPin },
   { id: CHECKOUT_STEPS.PAYMENT, label: 'Payment', icon: QrCode },
-  { id: CHECKOUT_STEPS.UPLOAD_PROOF, label: 'Proof', icon: Upload },
 ];
 
 export function CheckoutPage() {
@@ -44,14 +45,15 @@ export function CheckoutPage() {
   const voucherCode = searchParams.get('voucher') || '';
 
   const [step, setStep] = useState(CHECKOUT_STEPS.ADDRESS);
+  const [proofFiles, setProofFiles] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [addAddressOpen, setAddAddressOpen] = useState(false);
-  const [proofFiles, setProofFiles] = useState([]);
   const [createdOrder, setCreatedOrder] = useState(null);
 const [timeLeft, setTimeLeft] = useState(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const expiredRef = useRef(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [submitProofConfirmOpen, setSubmitProofConfirmOpen] = useState(false);
   const [addrRegion, setAddrRegion] = useState({ province: null, regency: null, district: null, village: null });
 
   // Shipping state
@@ -62,6 +64,8 @@ const [timeLeft, setTimeLeft] = useState(null);
   const [orderNote, setOrderNote] = useState('');
 
   const { items: cartItems, cartCount } = useCart({ isAuthenticated });
+  const { progress } = useMemberProgress({ enabled: isAuthenticated });
+  const memberFreeShipping = progress?.activeFreeShipping === true && (progress?.isMember === true);
 
   const selectedCartItems = itemIds.length > 0
     ? cartItems.filter((i) => itemIds.includes(i.id))
@@ -143,11 +147,17 @@ const [timeLeft, setTimeLeft] = useState(null);
       files.forEach((f) => fd.append('proofs', f));
       return uploadPaymentProof(orderId, fd);
     },
-    onSuccess: () => {
-      navigate(`/orders/${createdOrder?.id}`);
-    },
+    onSuccess: () => navigate(`/orders/${createdOrder?.id}`),
     onError: (err) => toast.error(err?.response?.data?.message || 'Failed to upload proof'),
   });
+
+  const handleSubmitProof = () => {
+    if (proofFiles.length === 0) {
+      toast.error('Wajib upload bukti pembayaran');
+      return;
+    }
+    uploadProofMutation.mutate({ orderId: createdOrder?.id, files: proofFiles });
+  };
 
   // True if every selected item has freeShipping enabled
   const allFreeShipping = selectedCartItems.length > 0 &&
@@ -213,7 +223,7 @@ const [timeLeft, setTimeLeft] = useState(null);
     setSelectedAddressId(id);
     setSelectedCourier(null);
     setShippingOptions([]);
-    fetchShipping(id);
+    if (!memberFreeShipping) fetchShipping(id);
   };
 
   const handleAddressNext = () => {
@@ -221,7 +231,7 @@ const [timeLeft, setTimeLeft] = useState(null);
       toast.error('Please select a delivery address');
       return;
     }
-    if (shippingOptions.length > 0 && !selectedCourier) {
+    if (!memberFreeShipping && shippingOptions.length > 0 && !selectedCourier) {
       toast.error('Please select a shipping courier');
       return;
     }
@@ -233,22 +243,14 @@ const [timeLeft, setTimeLeft] = useState(null);
       addressId: selectedAddressId,
       cartItemIds: itemIds,
       voucherCode: voucherCode || undefined,
-      shippingFee: selectedCourier?.cost ?? 0,
+      shippingFee: memberFreeShipping ? 0 : (selectedCourier?.cost ?? 0),
       courierService: selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : undefined,
       notes: orderNote.trim() || undefined,
     });
   };
 
-  const handleUploadProof = () => {
-    if (proofFiles.length === 0) {
-      toast.error('Please upload at least one payment proof');
-      return;
-    }
-    uploadProofMutation.mutate({ orderId: createdOrder?.id, files: proofFiles });
-  };
-
   useEffect(() => {
-    if (!createdOrder || step !== CHECKOUT_STEPS.PAYMENT) return;
+    if (!createdOrder) return;
     expiredRef.current = false;
     const expiryMs = createdOrder.expiresAt
       ? new Date(createdOrder.expiresAt).getTime()
@@ -263,7 +265,7 @@ const [timeLeft, setTimeLeft] = useState(null);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [createdOrder, step, navigate]);
+  }, [createdOrder, navigate]);
 
   const handleCancelOrder = async () => {
     try {
@@ -433,7 +435,18 @@ const [timeLeft, setTimeLeft] = useState(null);
                     </div>
 
                     <div className="p-5">
-                      {allFreeShipping ? (
+                      {memberFreeShipping ? (
+                        <div className="flex items-center gap-3 py-3 px-4 bg-brand-50 border border-brand-200 rounded-xl">
+                          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
+                            <Truck size={16} className="text-brand-700" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-brand-800">Gratis Ongkir Member</p>
+                            <p className="text-xs text-brand-600 mt-0.5">Benefit eksklusif untuk member.</p>
+                          </div>
+                          <span className="ml-auto text-sm font-bold text-brand-700">Rp 0</span>
+                        </div>
+                      ) : allFreeShipping ? (
                         <div className="flex items-center gap-3 py-3 px-4 bg-green-50 border border-green-200 rounded-xl">
                           <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                             <Truck size={16} className="text-green-600" />
@@ -545,12 +558,12 @@ const [timeLeft, setTimeLeft] = useState(null);
                   size="lg"
                   className="w-full"
                   onClick={handleAddressNext}
-                  disabled={!selectedAddressId || shippingLoading || (shippingOptions.length > 0 && !selectedCourier)}
+                  disabled={!selectedAddressId || (!memberFreeShipping && (shippingLoading || (shippingOptions.length > 0 && !selectedCourier)))}
                 >
                   <span className="flex items-center gap-2">
-                    {shippingLoading
+                    {!memberFreeShipping && shippingLoading
                       ? <><LoadingSpinner size="sm" /> Checking shipping...</>
-                      : shippingOptions.length > 0 && !selectedCourier
+                      : !memberFreeShipping && shippingOptions.length > 0 && !selectedCourier
                       ? 'Select a shipping courier'
                       : <>Continue to Payment <ChevronRight size={16} /></>
                     }
@@ -621,82 +634,61 @@ const [timeLeft, setTimeLeft] = useState(null);
                   </div>
                 </div>
 
+                {/* Upload bukti pembayaran */}
+                <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-dark-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Download size={15} className="text-brand-700" />
+                      <h2 className="font-bold text-dark-900 text-sm">Bukti Pembayaran</h2>
+                    </div>
+                    <span className="text-xs text-red-500 font-semibold">Wajib</span>
+                  </div>
+                  <div className="p-5 space-y-3">
+                    <p className="text-xs text-dark-400">
+                      Upload screenshot atau foto konfirmasi transfer yang menunjukkan nominal dan penerima dengan jelas.
+                    </p>
+                    <ImageUpload files={proofFiles} onChange={setProofFiles} multiple />
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
                     size="lg"
-                    className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
+                    className="flex-shrink-0 text-red-600 border-red-300 hover:bg-red-50"
                     onClick={() => setCancelModalOpen(true)}
                   >
-                    Cancel Order
+                    Cancel
                   </Button>
+                  <a href="/qris.jpeg" download="QRIS-SpillTheBill.jpeg">
+                    <Button variant="outline" size="lg" className="flex-shrink-0 border-brand-700 text-brand-800 hover:bg-brand-50">
+                      <Download size={16} />
+                      Download QRIS
+                    </Button>
+                  </a>
                   <Button
                     variant="primary"
                     size="lg"
                     className="flex-1"
                     onClick={() => {
-                      setStep(CHECKOUT_STEPS.UPLOAD_PROOF);
-                      setSearchParams((prev) => {
-                        const next = new URLSearchParams(prev);
-                        next.set('step', CHECKOUT_STEPS.UPLOAD_PROOF);
-                        return next;
-                      });
+                      if (proofFiles.length === 0) {
+                        toast.error('Wajib upload bukti pembayaran');
+                        return;
+                      }
+                      setSubmitProofConfirmOpen(true);
                     }}
-                  >
-                    <Upload size={16} />
-                    I&apos;ve paid — upload proof
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* ── Step 3: Upload Proof ── */}
-            {step === CHECKOUT_STEPS.UPLOAD_PROOF && (
-              <div className="bg-white rounded-2xl border border-dark-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-dark-100 flex items-center gap-2">
-                  <Upload size={16} className="text-brand-700" />
-                  <h2 className="font-bold text-dark-900">Upload Payment Proof</h2>
-                </div>
-
-                <div className="p-5 space-y-4">
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-amber-600 font-medium">Amount to confirm</p>
-                      <p className="font-bold text-amber-800 text-lg">
-                        {formatCurrency(createdOrder?.total || 0)}
-                      </p>
-                    </div>
-                    <p className="text-xs font-mono text-amber-500">
-                      #{createdOrder?.id?.slice(0, 8).toUpperCase()}
-                    </p>
-                  </div>
-
-                  <p className="text-xs text-dark-400">
-                    Upload a screenshot or photo showing the transfer confirmation with the amount and recipient clearly visible.
-                  </p>
-
-                  <ImageUpload
-                    files={proofFiles}
-                    onChange={setProofFiles}
-                    multiple
-                  />
-
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full"
-                    onClick={handleUploadProof}
                     disabled={proofFiles.length === 0 || uploadProofMutation.isPending}
                   >
                     {uploadProofMutation.isPending ? (
-                      <span className="flex items-center gap-2"><LoadingSpinner size="sm" /> Submitting...</span>
+                      <span className="flex items-center gap-2"><LoadingSpinner size="sm" /> Mengirim...</span>
                     ) : (
-                      `Submit ${proofFiles.length > 0 ? `(${proofFiles.length} file${proofFiles.length > 1 ? 's' : ''})` : 'Payment'}`
+                      `Submit Bukti${proofFiles.length > 0 ? ` (${proofFiles.length})` : ''}`
                     )}
                   </Button>
                 </div>
               </div>
             )}
+
           </div>
 
           {/* ── Right: Order summary ── */}
@@ -761,7 +753,9 @@ const [timeLeft, setTimeLeft] = useState(null);
                       {selectedCourier ? `${selectedCourier.courier} ${selectedCourier.service}` : 'Shipping'}
                     </span>
                     <span>
-                      {allFreeShipping
+                      {memberFreeShipping
+                        ? <span className="text-brand-700 font-semibold">Gratis (Member)</span>
+                        : allFreeShipping
                         ? <span className="text-green-600 font-semibold">Gratis</span>
                         : shippingLoading
                         ? '...'
@@ -854,6 +848,18 @@ const [timeLeft, setTimeLeft] = useState(null);
           </div>
         </div>
       </Modal>
+
+      {/* ── Submit Proof Confirm Modal ── */}
+      <ConfirmModal
+        isOpen={submitProofConfirmOpen}
+        onCancel={() => setSubmitProofConfirmOpen(false)}
+        onConfirm={() => { setSubmitProofConfirmOpen(false); handleSubmitProof(); }}
+        variant="primary"
+        title="Konfirmasi Bukti Pembayaran"
+        message={`Kamu akan mengirim ${proofFiles.length} bukti pembayaran. Pastikan gambar sudah jelas dan menunjukkan nominal yang benar.`}
+        confirmLabel="Ya, kirim bukti"
+        cancelLabel="Cek lagi"
+      />
 
       {/* ── Cancel Order Modal ── */}
       <Modal

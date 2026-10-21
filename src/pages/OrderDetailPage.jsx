@@ -50,6 +50,8 @@ export function OrderDetailPage() {
 
   const [proofOpen, setProofOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [refundDetailConfirmOpen, setRefundDetailConfirmOpen] = useState(false);
+  const [pendingRefundData, setPendingRefundData] = useState(null);
   const [proofFiles, setProofFiles] = useState([]);
   const [refundMethod, setRefundMethod] = useState('BANK');
   const [timeLeft, setTimeLeft] = useState(null);
@@ -533,7 +535,7 @@ export function OrderDetailPage() {
                     </button>
                   ))}
                 </div>
-                <form onSubmit={handleSubmit((d) => refundDetailMutation.mutate(d))} className="space-y-3">
+                <form onSubmit={handleSubmit((d) => { setPendingRefundData({ ...d, method: refundMethod }); setRefundDetailConfirmOpen(true); })} className="space-y-3">
                   {refundMethod === 'BANK' ? (
                     <>
                       <div className="relative">
@@ -613,6 +615,17 @@ export function OrderDetailPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={refundDetailConfirmOpen}
+        onCancel={() => { setRefundDetailConfirmOpen(false); setPendingRefundData(null); }}
+        onConfirm={() => { setRefundDetailConfirmOpen(false); refundDetailMutation.mutate(pendingRefundData); setPendingRefundData(null); }}
+        variant="primary"
+        title="Konfirmasi Detail Refund"
+        message="Pastikan detail rekening yang kamu masukkan sudah benar. Data ini akan digunakan admin untuk mentransfer dana refund dan tidak bisa diubah setelah dikirim."
+        confirmLabel="Ya, kirim detail"
+        cancelLabel="Cek lagi"
+      />
 
       <ConfirmModal
         isOpen={cancelConfirmOpen}

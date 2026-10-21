@@ -50,10 +50,9 @@ export function AdminMembersPage() {
   useEffect(() => {
     if (settings && Object.keys(settings).length > 0) {
       reset({
-        minMonthlyAmount: settings.minMonthlyAmount ?? 0,
-        discountPercent: settings.discountPercent ?? 0,
+        minMonthlyAmount: settings.minMonthlyAmount ?? 500000,
+        hasFreeShipping: settings.hasFreeShipping ?? true,
         renewalPeriodDays: settings.renewalPeriodDays ?? 30,
-        hasFreeShipping: settings.hasFreeShipping ?? false,
       });
     }
   }, [settings, reset]);
@@ -79,21 +78,14 @@ export function AdminMembersPage() {
         ) : (
           <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-4 max-w-md">
             <Input
-              label="Minimum Spend to Become Member (IDR)"
+              label="Minimum Belanja per Bulan (IDR)"
               type="number"
               placeholder="500000"
               error={errors.minMonthlyAmount?.message}
               {...register('minMonthlyAmount', { required: true, min: 0, valueAsNumber: true })}
             />
             <Input
-              label="Member Discount (%)"
-              type="number"
-              placeholder="10"
-              error={errors.discountPercent?.message}
-              {...register('discountPercent', { required: true, min: 0, max: 100, valueAsNumber: true })}
-            />
-            <Input
-              label="Membership Duration (Days)"
+              label="Durasi Membership (Hari)"
               type="number"
               placeholder="30"
               error={errors.renewalPeriodDays?.message}
@@ -107,7 +99,7 @@ export function AdminMembersPage() {
                 {...register('hasFreeShipping')}
               />
               <label htmlFor="hasFreeShipping" className="text-sm font-medium text-dark-700">
-                Members get free shipping
+                Member mendapat gratis ongkir
               </label>
             </div>
             <Button
@@ -143,8 +135,8 @@ export function AdminMembersPage() {
                 <tr>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Name</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Email</th>
-                  <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Total Spend</th>
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Member Since</th>
+                  <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Expiry</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-100">
@@ -152,8 +144,8 @@ export function AdminMembersPage() {
                   <tr key={m.id} className={i % 2 === 0 ? 'bg-white' : 'bg-dark-50/50'}>
                     <td className="px-4 py-3 font-medium text-dark-900">{m.name}</td>
                     <td className="px-4 py-3 text-dark-600">{m.email}</td>
-                    <td className="px-4 py-3 font-medium">{formatCurrency(m.totalSpend || 0)}</td>
                     <td className="px-4 py-3 text-dark-500">{formatDate(m.memberSince || m.createdAt)}</td>
+                    <td className="px-4 py-3 text-dark-500">{m.memberExpiry ? formatDate(m.memberExpiry) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -171,10 +171,6 @@ export function LandingPage() {
 
               {/* Left: text */}
               <div>
-                <div className="h-badge inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-brand-800/40 bg-brand-950/40 backdrop-blur-sm text-brand-300 text-xs font-semibold uppercase tracking-widest mb-10">
-                  <span className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-pulse" />
-                  Jakarta's Personal Jastip &amp; Preloved
-                </div>
 
                 <div className="overflow-hidden mb-2">
                   <h1 className="h-line-1 font-black text-white leading-[0.88] tracking-tight"
@@ -385,10 +381,6 @@ export function LandingPage() {
         {/* ── CTA ── */}
         <section className="bg-[#0a0303] py-32 px-6 lg:px-10">
           <div ref={addRef} className="reveal max-w-5xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-800/40 bg-brand-950/40 text-brand-300 text-xs font-semibold uppercase tracking-widest mb-8">
-              <Star size={12} className="text-yellow-400 fill-yellow-400" />
-              Trusted by 2,400+ happy shoppers
-            </div>
             <h2
               className="font-black text-white leading-[1.0] mb-6"
               style={{ fontSize: 'clamp(3rem,7vw,6rem)' }}

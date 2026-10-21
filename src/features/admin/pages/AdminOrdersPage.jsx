@@ -20,6 +20,8 @@ const STATUS_FILTERS = [
   { value: ORDER_STATUS.SHIPPED, label: 'Shipped' },
   { value: ORDER_STATUS.DELIVERED, label: 'Delivered' },
   { value: ORDER_STATUS.PAYMENT_REJECTED, label: 'Rejected' },
+  { value: ORDER_STATUS.REFUND_REQUESTED, label: 'Refund Requested' },
+  { value: ORDER_STATUS.REFUNDED, label: 'Refunded' },
 ];
 
 export function AdminOrdersPage() {

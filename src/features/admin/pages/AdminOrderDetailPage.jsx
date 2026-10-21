@@ -550,14 +550,22 @@ export function AdminOrderDetailPage() {
                 </Button>
               )}
               {showProcessRefund && (
-                <Button
-                  variant="primary"
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
-                  onClick={() => setRefundOpen(true)}
-                >
-                  <RefreshCw size={16} />
-                  Process Refund
-                </Button>
+                <div className="flex-1" title={!refundDetail ? 'User belum mengisi detail rekening refund' : undefined}>
+                  <Button
+                    variant="primary"
+                    className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => setRefundOpen(true)}
+                    disabled={!refundDetail}
+                  >
+                    <RefreshCw size={16} />
+                    Process Refund
+                  </Button>
+                  {!refundDetail && (
+                    <p className="text-xs text-orange-600 text-center mt-1.5">
+                      Menunggu user mengisi detail rekening
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
