@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, User, ChevronRight } from 'lucide-react';
+import { Search, User, ChevronRight, ShieldCheck, ShieldOff } from 'lucide-react';
 import api from '../../../shared/services/api';
 import { useDebounce } from '../../../shared/hooks/useDebounce';
 import Badge from '../../../shared/components/Badge';
@@ -61,6 +61,7 @@ export function AdminUsersPage() {
                 <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Email</th>
                 <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Phone</th>
                 <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Role</th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Verified</th>
                 <th scope="col" className="text-left px-4 py-3 font-semibold text-dark-700">Joined</th>
                 <th scope="col" className="text-right px-4 py-3 font-semibold text-dark-700"><span className="sr-only">Actions</span></th>
               </tr>
@@ -75,6 +76,17 @@ export function AdminUsersPage() {
                     <Badge color={u.role === USER_ROLES.ADMIN ? 'brand' : 'gray'}>
                       {u.role}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.isVerified ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
+                        <ShieldCheck size={13} /> Verified
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-dark-400">
+                        <ShieldOff size={13} /> Unverified
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-dark-500">{formatDate(u.createdAt)}</td>
                   <td className="px-4 py-3 text-right">

@@ -14,8 +14,8 @@ export async function register({ name, email, password, phone, otp }) {
   return res.data;
 }
 
-export async function sendOtp(email) {
-  const res = await api.post('/auth/send-otp', { email });
+export async function sendOtp(email, type) {
+  const res = await api.post('/auth/send-otp', { email, ...(type ? { type } : {}) });
   return res.data;
 }
 

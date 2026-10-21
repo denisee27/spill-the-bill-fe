@@ -244,7 +244,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }) {
     setServerError('');
     setOtpSending(true);
     try {
-      await sendOtp(formData.email);
+      await sendOtp(formData.email, 'register');
       setOtpEmail(formData.email);
       startCountdown();
       setRegisterStep(2);
