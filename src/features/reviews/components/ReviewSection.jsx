@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Star, MessageSquare, Image, Play } from 'lucide-react';
 import { getProductReviews } from '../services/review.service';
 import { imageUrl } from '../../../shared/utils/format';
+import { ImageLightbox } from '../../../shared/components/ImageLightbox';
 
 export function StarRating({ value, onChange, size = 20 }) {
   const [hover, setHover] = useState(0);
@@ -59,6 +60,7 @@ function formatDate(dateStr) {
 
 export function ReviewSection({ productId }) {
   const [filter, setFilter] = useState('all');
+  const [lightbox, setLightbox] = useState(null);
 
   const { data } = useQuery({
     queryKey: ['reviews', productId],
@@ -187,33 +189,42 @@ export function ReviewSection({ productId }) {
                         {r.comment && (
                           <p className="text-sm text-dark-700 mt-2 leading-relaxed">{r.comment}</p>
                         )}
-                        {media.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {media.map((url, i) => {
-                              const isVideo = /\.(mp4|mov|webm|avi)$/i.test(url);
-                              return (
-                                <a
-                                  key={i}
-                                  href={imageUrl(url)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="relative w-20 h-20 rounded-xl overflow-hidden bg-dark-100 flex-shrink-0 block hover:opacity-90 transition-opacity"
-                                >
-                                  {isVideo ? (
-                                    <>
-                                      <video src={imageUrl(url)} className="w-full h-full object-cover" muted playsInline preload="metadata" />
-                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                                        <Play size={16} className="text-white fill-white" />
-                                      </div>
-                                    </>
-                                  ) : (
+                        {media.length > 0 && (() => {
+                          const imageUrls = media
+                            .filter((u) => !/\.(mp4|mov|webm|avi)$/i.test(u))
+                            .map((u) => imageUrl(u));
+                          return (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {media.map((url, i) => {
+                                const isVideo = /\.(mp4|mov|webm|avi)$/i.test(url);
+                                const imgIndex = imageUrls.indexOf(imageUrl(url));
+                                return isVideo ? (
+                                  <a
+                                    key={i}
+                                    href={imageUrl(url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="relative w-20 h-20 rounded-xl overflow-hidden bg-dark-100 flex-shrink-0 block hover:opacity-90 transition-opacity"
+                                  >
+                                    <video src={imageUrl(url)} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                      <Play size={16} className="text-white fill-white" />
+                                    </div>
+                                  </a>
+                                ) : (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => setLightbox({ images: imageUrls, index: imgIndex })}
+                                    className="relative w-20 h-20 rounded-xl overflow-hidden bg-dark-100 flex-shrink-0 block hover:opacity-90 transition-opacity"
+                                  >
                                     <img src={imageUrl(url)} alt="" className="w-full h-full object-cover" />
-                                  )}
-                                </a>
-                              );
-                            })}
-                          </div>
-                        )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -222,6 +233,14 @@ export function ReviewSection({ productId }) {
             </div>
           )}
         </>
+      )}
+
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );

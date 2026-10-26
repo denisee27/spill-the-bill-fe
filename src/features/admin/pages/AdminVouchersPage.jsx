@@ -81,7 +81,7 @@ export function AdminVouchersPage() {
       code: v.code,
       type: v.type,
       value: v.value,
-      minOrder: v.minOrder || '',
+      minOrder: v.minOrderAmount || v.minOrder || '',
       maxUses: v.maxUses || '',
       expiresAt: v.expiresAt ? v.expiresAt.slice(0, 10) : '',
     });
@@ -150,7 +150,7 @@ export function AdminVouchersPage() {
                       ? `${v.value}%`
                       : formatCurrency(v.value)}
                   </td>
-                  <td className="px-4 py-3 text-dark-600">{v.minOrder ? formatCurrency(v.minOrder) : '-'}</td>
+                  <td className="px-4 py-3 text-dark-600">{(v.minOrderAmount || v.minOrder) ? formatCurrency(v.minOrderAmount ?? v.minOrder) : '-'}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => setUsageVoucher(v)}
@@ -199,7 +199,17 @@ export function AdminVouchersPage() {
         title={editing ? 'Edit Voucher' : 'Add Voucher'}
         size="sm"
       >
-        <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-4">
+        <form onSubmit={handleSubmit((d) => {
+          const payload = {
+            code: d.code,
+            type: d.type,
+            value: Number(d.value),
+            minOrderAmount: d.minOrder ? Number(d.minOrder) : 0,
+            ...(d.maxUses ? { maxUses: Number(d.maxUses) } : {}),
+            ...(d.expiresAt ? { expiresAt: new Date(d.expiresAt).toISOString() } : {}),
+          };
+          saveMutation.mutate(payload);
+        })} className="space-y-4">
           <Input
             label="Code"
             required

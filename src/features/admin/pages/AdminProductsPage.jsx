@@ -14,6 +14,7 @@ import EmptyState from '../../../shared/components/EmptyState';
 import { formatCurrency, imageUrl, formatDate } from '../../../shared/utils/format';
 import { AdminProductModal } from '../components/AdminProductModal';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { ImageLightbox } from '../../../shared/components/ImageLightbox';
 import clsx from 'clsx';
 
 const SORT_OPTIONS = [
@@ -75,6 +76,7 @@ export function AdminProductsPage() {
   const [editingStockValue, setEditingStockValue] = useState('');
   const [productModal, setProductModal] = useState({ open: false, productId: null, isDuplicate: false });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
   const queryClient = useQueryClient();
 
   const { types: productTypes } = useProductTypes({ includeInactive: true });
@@ -381,6 +383,7 @@ export function AdminProductsPage() {
               </thead>
               <tbody className="divide-y divide-dark-100">
                 {products.map((p, i) => {
+                  const allImgs = (p.images || []).map((im) => imageUrl(im?.url || im)).filter(Boolean);
                   const img = p.images?.[0]?.url || p.images?.[0];
                   const isSelected = selectedIds.has(p.id);
                   const soldOut = p.isSoldOut;
@@ -398,7 +401,10 @@ export function AdminProductsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-dark-200 flex-shrink-0">
+                          <div
+                            className={clsx('w-10 h-10 rounded-lg overflow-hidden bg-dark-200 flex-shrink-0', allImgs.length && 'cursor-zoom-in')}
+                            onClick={(e) => { if (allImgs.length) { e.stopPropagation(); setLightbox({ images: allImgs, index: 0 }); } }}
+                          >
                             {img && <img src={imageUrl(img)} alt={p.name} className="w-full h-full object-cover" />}
                           </div>
                           <span className="font-medium text-dark-900 line-clamp-1">{p.name}</span>
@@ -475,6 +481,8 @@ export function AdminProductsPage() {
         message={`Delete product "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel={deleteMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
       />
+
+      {lightbox && <ImageLightbox images={lightbox.images} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
     </div>
   );
 }

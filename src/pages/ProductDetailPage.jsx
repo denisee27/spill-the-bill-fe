@@ -19,6 +19,7 @@ import { WHATSAPP_DEFAULT_NUMBER } from '../shared/constants';
 import { useWhatsappSetting } from '../features/settings/hooks/useWhatsappSetting';
 import clsx from 'clsx';
 import { SEO } from '../shared/components/SEO';
+import { ImageLightbox } from '../shared/components/ImageLightbox';
 import { FavoriteButton } from '../features/favorites/components/FavoriteButton';
 import { ShareProductButtons } from '../shared/components/ShareProductButtons';
 import { ReviewSection } from '../features/reviews/components/ReviewSection';
@@ -32,6 +33,7 @@ export function ProductDetailPage() {
   const { user, isAuthenticated, logout } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [lightbox, setLightbox] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [showStickyBar, setShowStickyBar] = useState(false);
@@ -181,7 +183,16 @@ export function ProductDetailPage() {
                 return isVid ? (
                   <video src={src} className="w-full h-full object-contain" controls playsInline preload="metadata" />
                 ) : (
-                  <img src={src} alt={product.name} className="w-full h-full object-contain p-2" />
+                  <button
+                    type="button"
+                    className="w-full h-full cursor-zoom-in"
+                    onClick={() => {
+                      const allImgs = images.map((im) => imageUrl(im.url || im));
+                      setLightbox({ images: allImgs.length ? allImgs : [src], index: selectedImageIndex });
+                    }}
+                  >
+                    <img src={src} alt={product.name} className="w-full h-full object-contain p-2" />
+                  </button>
                 );
               })() : (
                 <div className="w-full h-full flex items-center justify-center text-dark-300 text-6xl">?</div>
@@ -445,6 +456,7 @@ export function ProductDetailPage() {
       )}
 
       <LoginModal isOpen={loginOpen} onClose={() => setLoginOpen(false)} />
+      {lightbox && <ImageLightbox images={lightbox.images} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
     </div>
   );
 }

@@ -76,31 +76,38 @@ export function AdminMembersPage() {
         {settingsLoading ? (
           <LoadingSpinner />
         ) : (
-          <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-4 max-w-md">
+          <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-5 max-w-lg">
             <Input
-              label="Minimum Belanja per Bulan (IDR)"
+              label="Minimum Total Belanja (IDR)"
               type="number"
               placeholder="500000"
               error={errors.minMonthlyAmount?.message}
+              hint="Total belanja kumulatif user selama periode membership (sesuai Durasi Membership di bawah) yang harus dipenuhi agar status member aktif atau diperpanjang otomatis. Contoh: jika durasi 180 hari dan diisi 500000, user harus belanja minimal Rp500.000 dalam 180 hari terakhir."
               {...register('minMonthlyAmount', { required: true, min: 0, valueAsNumber: true })}
             />
             <Input
               label="Durasi Membership (Hari)"
               type="number"
-              placeholder="30"
+              placeholder="180"
               error={errors.renewalPeriodDays?.message}
+              hint="Berapa hari membership berlaku sejak pertama kali aktif atau diperpanjang. Contoh: isi 180 berarti member berlaku selama 6 bulan. Jika belanja kumulatif mencukupi sebelum expired, sistem akan memperpanjang otomatis."
               {...register('renewalPeriodDays', { required: true, min: 1, max: 365, valueAsNumber: true })}
             />
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="hasFreeShipping"
-                className="w-4 h-4 accent-brand-800"
-                {...register('hasFreeShipping')}
-              />
-              <label htmlFor="hasFreeShipping" className="text-sm font-medium text-dark-700">
-                Member mendapat gratis ongkir
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="hasFreeShipping"
+                  className="w-4 h-4 accent-brand-800 flex-shrink-0"
+                  {...register('hasFreeShipping')}
+                />
+                <label htmlFor="hasFreeShipping" className="text-sm font-medium text-dark-700">
+                  Member mendapat gratis ongkir
+                </label>
+              </div>
+              <p className="text-xs text-dark-500 pl-7">
+                Jika diaktifkan, semua user dengan status member aktif akan otomatis mendapat ongkir gratis saat checkout, tanpa perlu kode voucher. Jika dinonaktifkan, member tetap mendapat hak akses produk eksklusif tapi tidak gratis ongkir.
+              </p>
             </div>
             <Button
               type="submit"

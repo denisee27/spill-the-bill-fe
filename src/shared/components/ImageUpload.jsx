@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, X } from 'lucide-react';
 import clsx from 'clsx';
+import { ImageLightbox } from './ImageLightbox';
 
 export function ImageUpload({ files = [], onChange, multiple = true, className = '' }) {
   const [previews, setPreviews] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   useEffect(() => {
     const urls = files.map((file) =>
@@ -57,21 +59,31 @@ export function ImageUpload({ files = [], onChange, multiple = true, className =
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {previews.map((src, index) => (
             <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-dark-200 bg-dark-50">
-              <img
-                src={src}
-                alt={`Preview ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
               <button
                 type="button"
-                onClick={() => removeFile(index)}
-                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => setLightboxIndex(index)}
+                className="w-full h-full cursor-zoom-in"
+              >
+                <img
+                  src={src}
+                  alt={`Preview ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
               >
                 <X size={12} />
               </button>
             </div>
           ))}
         </div>
+      )}
+
+      {lightboxIndex !== null && (
+        <ImageLightbox images={previews} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
       )}
     </div>
   );

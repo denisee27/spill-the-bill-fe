@@ -21,6 +21,7 @@ import Button from '../../../shared/components/Button';
 import Input from '../../../shared/components/Input';
 import Modal from '../../../shared/components/Modal';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { ImageLightbox } from '../../../shared/components/ImageLightbox';
 import LoadingSpinner from '../../../shared/components/LoadingSpinner';
 import EmptyState from '../../../shared/components/EmptyState';
 import { formatDate, formatCurrency, imageUrl } from '../../../shared/utils/format';
@@ -57,6 +58,7 @@ export function AdminEventsPage() {
   const debouncedSearch = useDebounce(productSearch, 300);
   const [bannerFile, setBannerFile] = useState(null);
   const [bannerPreview, setBannerPreview] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const queryClient = useQueryClient();
 
   // --- Events list ---
@@ -257,11 +259,13 @@ export function AdminEventsPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {ev.bannerImage ? (
-                          <img
-                            src={imageUrl(ev.bannerImage)}
-                            alt={ev.name}
-                            className="w-12 h-8 object-cover rounded-lg border border-dark-100 flex-shrink-0"
-                          />
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxSrc(imageUrl(ev.bannerImage)); }} className="flex-shrink-0 cursor-zoom-in">
+                            <img
+                              src={imageUrl(ev.bannerImage)}
+                              alt={ev.name}
+                              className="w-12 h-8 object-cover rounded-lg border border-dark-100"
+                            />
+                          </button>
                         ) : (
                           <div className="w-12 h-8 rounded-lg bg-dark-100 flex items-center justify-center flex-shrink-0">
                             <ImageIcon size={13} className="text-dark-400" />
@@ -393,7 +397,8 @@ export function AdminEventsPage() {
                   <img
                     src={bannerPreview || existingBannerUrl}
                     alt="Banner preview"
-                    className="w-full h-32 object-cover"
+                    className="w-full h-32 object-cover cursor-zoom-in"
+                    onClick={() => setLightboxSrc(bannerPreview || existingBannerUrl)}
                   />
                   {bannerPreview && (
                     <button
@@ -654,6 +659,8 @@ export function AdminEventsPage() {
         message={`Yakin ingin menghapus event "${deleteTarget?.name}"?`}
         confirmLabel={deleteMutation.isPending ? 'Menghapus...' : 'Ya, Hapus'}
       />
+
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }

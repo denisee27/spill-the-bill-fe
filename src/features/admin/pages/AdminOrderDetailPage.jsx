@@ -69,7 +69,7 @@ export function AdminOrderDetailPage() {
   const [adminRefundOpen, setAdminRefundOpen] = useState(false);
   const [refundProofs, setRefundProofs] = useState([]);
   const [deliverProofs, setDeliverProofs] = useState([]);
-  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const { register: registerRefund, handleSubmit: handleRefundSubmit, reset: resetRefund } = useForm();
@@ -364,7 +364,7 @@ export function AdminOrderDetailPage() {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setLightboxSrc(imageUrl(proof.imageUrl || proof.url || proof))}
+                    onClick={() => setLightbox({ images: proofs.map((p) => imageUrl(p.imageUrl || p.url || p)), index: i })}
                     className="aspect-square rounded-xl overflow-hidden border border-dark-200 block"
                   >
                     <img
@@ -405,7 +405,7 @@ export function AdminOrderDetailPage() {
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setLightboxSrc(imageUrl(img.imageUrl))}
+                        onClick={() => setLightbox({ images: refundRequest.images.map((im) => imageUrl(im.imageUrl)), index: i })}
                         className="aspect-square rounded-lg overflow-hidden border border-orange-200 block"
                       >
                         <img src={imageUrl(img.imageUrl)} alt={`Refund proof ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform" />
@@ -431,7 +431,7 @@ export function AdminOrderDetailPage() {
                           <button
                             key={i}
                             type="button"
-                            onClick={() => setLightboxSrc(imageUrl(img))}
+                            onClick={() => setLightbox({ images: parseAdminProofImages(refundRequest.adminProofImages).map((im) => imageUrl(im)), index: i })}
                             className="aspect-square rounded-lg overflow-hidden border border-orange-200 block"
                           >
                             <img src={imageUrl(img)} alt={`Admin proof ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform" />
@@ -471,7 +471,7 @@ export function AdminOrderDetailPage() {
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setLightboxSrc(imageUrl(img))}
+                      onClick={() => setLightbox({ images: deliveryProofImages.map((im) => imageUrl(im)), index: i })}
                       className="aspect-square rounded-xl overflow-hidden border border-blue-200 block"
                     >
                       <img
@@ -492,19 +492,47 @@ export function AdminOrderDetailPage() {
           {/* Refund Detail from user (bank/ewallet) */}
           {refundDetail && (
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-              <h2 className="font-bold text-blue-900 mb-3">Customer Refund Account Details</h2>
-              {refundDetail.method === 'BANK' ? (
-                <div className="space-y-1.5 text-sm text-blue-800">
-                  <p><span className="font-medium">Bank:</span> {refundDetail.bankName}</p>
-                  <p><span className="font-medium">Account No.:</span> {refundDetail.accountNumber}</p>
-                  <p><span className="font-medium">Account Name:</span> {refundDetail.accountName}</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5 text-sm text-blue-800">
-                  <p><span className="font-medium">E-Wallet:</span> {refundDetail.ewalletPlatform}</p>
-                  <p><span className="font-medium">Number:</span> {refundDetail.ewalletNumber}</p>
-                </div>
-              )}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-blue-900">Customer Refund Account</h2>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+                  {refundDetail.method === 'BANK' ? 'Bank Transfer' : 'E-Wallet'}
+                </span>
+              </div>
+              <div className="bg-white border border-blue-200 rounded-xl divide-y divide-blue-100">
+                {refundDetail.method === 'BANK' ? (
+                  <>
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Bank</span>
+                      <span className="text-sm font-semibold text-dark-900">{refundDetail.bankName}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Nomor Rekening</span>
+                      <span className="text-sm font-semibold text-dark-900 font-mono">{refundDetail.accountNumber}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Atas Nama</span>
+                      <span className="text-sm font-semibold text-dark-900">{refundDetail.accountName}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Platform</span>
+                      <span className="text-sm font-semibold text-dark-900">{refundDetail.ewalletPlatform}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Nomor</span>
+                      <span className="text-sm font-semibold text-dark-900 font-mono">{refundDetail.ewalletNumber}</span>
+                    </div>
+                    {refundDetail.ewalletName && (
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-xs text-dark-500">Atas Nama</span>
+                        <span className="text-sm font-semibold text-dark-900">{refundDetail.ewalletName}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -706,7 +734,7 @@ export function AdminOrderDetailPage() {
         </form>
       </Modal>
 
-      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+      {lightbox && <ImageLightbox images={lightbox.images} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
 
       {/* Process Refund modal */}
       <Modal isOpen={refundOpen} onClose={() => { setRefundOpen(false); setRefundProofs([]); resetRefund(); }} title="Process Refund" size="md">

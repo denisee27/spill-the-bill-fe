@@ -3,6 +3,7 @@ import { X, Play, Plus, Camera, Image, Wand2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { removeBackground } from '@imgly/background-removal';
 import { imageUrl } from '../utils/format';
+import { ImageLightbox } from './ImageLightbox';
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -59,6 +60,7 @@ export function MediaUpload({ files = [], onChange }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [processing, setProcessing] = useState({});
   const [isDragging, setIsDragging] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const pickerRef = useRef(null);
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
@@ -153,56 +155,75 @@ export function MediaUpload({ files = [], onChange }) {
       {!isDragging && (
         <>
           <div className="flex flex-wrap gap-3 mb-3">
-            {files.map((file, i) => (
-              <div
-                key={i}
-                className="relative w-24 h-24 rounded-xl overflow-hidden border border-dark-200 bg-dark-50 flex-shrink-0 group"
-              >
-                {isVideo(file) ? (
-                  <video
-                    src={getPreviewUrl(file)}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  <img src={getPreviewUrl(file)} className="w-full h-full object-cover" alt="" />
-                )}
-
-                {/* Remove button */}
-                <button
-                  type="button"
-                  onClick={() => handleRemove(i)}
-                  className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors z-10"
-                >
-                  <X size={11} />
-                </button>
-
-                {/* Remove background button — only for image Files */}
-                {file instanceof File && !isVideo(file) && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveBackground(i)}
-                    disabled={processing[i]}
-                    title="Remove background"
-                    className="absolute bottom-1 left-1 w-6 h-6 bg-brand-800 text-white rounded-full flex items-center justify-center hover:bg-brand-700 transition-colors z-10 disabled:opacity-60"
+            {(() => {
+              const imageUrls = files
+                .filter((f) => !isVideo(f))
+                .map((f) => getPreviewUrl(f));
+              return files.map((file, i) => {
+                const imgIndexInGallery = isVideo(file) ? -1 : imageUrls.indexOf(getPreviewUrl(file));
+                return (
+                  <div
+                    key={i}
+                    className="relative w-24 h-24 rounded-xl overflow-hidden border border-dark-200 bg-dark-50 flex-shrink-0 group"
                   >
-                    {processing[i]
-                      ? <Loader2 size={11} className="animate-spin" />
-                      : <Wand2 size={11} />
-                    }
-                  </button>
-                )}
+                    {isVideo(file) ? (
+                      <>
+                        <video
+                          src={getPreviewUrl(file)}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                          <Play size={18} className="text-white fill-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setLightboxIndex(imgIndexInGallery)}
+                        className="w-full h-full cursor-zoom-in"
+                      >
+                        <img src={getPreviewUrl(file)} className="w-full h-full object-cover" alt="" />
+                      </button>
+                    )}
 
-                {/* Processing overlay */}
-                {processing[i] && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <Loader2 size={20} className="text-white animate-spin" />
+                    {/* Remove button */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleRemove(i); }}
+                      className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors z-10"
+                    >
+                      <X size={11} />
+                    </button>
+
+                    {/* Remove background button — only for image Files */}
+                    {file instanceof File && !isVideo(file) && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemoveBackground(i); }}
+                        disabled={processing[i]}
+                        title="Remove background"
+                        className="absolute bottom-1 left-1 w-6 h-6 bg-brand-800 text-white rounded-full flex items-center justify-center hover:bg-brand-700 transition-colors z-10 disabled:opacity-60"
+                      >
+                        {processing[i]
+                          ? <Loader2 size={11} className="animate-spin" />
+                          : <Wand2 size={11} />
+                        }
+                      </button>
+                    )}
+
+                    {/* Processing overlay */}
+                    {processing[i] && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
+                        <Loader2 size={20} className="text-white animate-spin" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              });
+            })()}
 
             {/* Add button */}
             <div className="relative flex-shrink-0" ref={pickerRef}>
@@ -252,6 +273,14 @@ export function MediaUpload({ files = [], onChange }) {
             </p>
           </div>
         </>
+      )}
+
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={files.filter((f) => !isVideo(f)).map((f) => getPreviewUrl(f))}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   );

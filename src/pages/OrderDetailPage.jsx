@@ -19,8 +19,8 @@ import { Navbar } from '../shared/components/Navbar';
 import Button from '../shared/components/Button';
 import Modal from '../shared/components/Modal';
 import { ConfirmModal } from '../shared/components/ConfirmModal';
+import { ImageLightbox } from '../shared/components/ImageLightbox';
 import ImageUpload from '../shared/components/ImageUpload';
-import LoadingSpinner from '../shared/components/LoadingSpinner';
 import { Footer } from '../shared/components/Footer';
 import { formatCurrency, formatDateTime, imageUrl } from '../shared/utils/format';
 import { ORDER_STATUS, ORDER_STATUS_LABEL } from '../shared/constants';
@@ -48,6 +48,7 @@ export function OrderDetailPage() {
   const { data, isLoading, error } = useOrder(id);
   const order = data?.data || data?.order || data;
 
+  const [lightbox, setLightbox] = useState(null);
   const [proofOpen, setProofOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [refundDetailConfirmOpen, setRefundDetailConfirmOpen] = useState(false);
@@ -57,7 +58,7 @@ export function OrderDetailPage() {
   const [timeLeft, setTimeLeft] = useState(null);
   const expiredRef = useRef(false);
 
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
   useEffect(() => {
     if (!order || order.status !== 'PENDING_PAYMENT') return;
@@ -149,8 +150,62 @@ export function OrderDetailPage() {
         </Link>
 
         {isLoading ? (
-          <div className="flex justify-center py-20">
-            <LoadingSpinner size="lg" />
+          <div className="space-y-5 animate-pulse">
+            {/* Header card skeleton */}
+            <div className="bg-white rounded-2xl border border-dark-200 p-5">
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div className="space-y-2">
+                  <div className="h-5 w-40 bg-dark-200 rounded-lg" />
+                  <div className="h-3.5 w-28 bg-dark-100 rounded-lg" />
+                </div>
+                <div className="h-7 w-24 bg-dark-200 rounded-full" />
+              </div>
+              {/* Timeline dots */}
+              <div className="flex items-center gap-0">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center flex-1 last:flex-none">
+                    <div className="w-7 h-7 rounded-full bg-dark-200 flex-shrink-0" />
+                    {i < 4 && <div className="flex-1 h-0.5 bg-dark-100" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Items card skeleton */}
+            <div className="bg-white rounded-2xl border border-dark-200 p-5 space-y-4">
+              <div className="h-4 w-24 bg-dark-200 rounded-lg" />
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="w-16 h-16 rounded-xl bg-dark-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-4 w-3/4 bg-dark-200 rounded-lg" />
+                    <div className="h-3.5 w-1/2 bg-dark-100 rounded-lg" />
+                    <div className="h-3.5 w-1/3 bg-dark-100 rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Address card skeleton */}
+            <div className="bg-white rounded-2xl border border-dark-200 p-5 space-y-2">
+              <div className="h-4 w-32 bg-dark-200 rounded-lg" />
+              <div className="h-3.5 w-3/4 bg-dark-100 rounded-lg" />
+              <div className="h-3.5 w-1/2 bg-dark-100 rounded-lg" />
+            </div>
+
+            {/* Price summary skeleton */}
+            <div className="bg-white rounded-2xl border border-dark-200 p-5 space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex justify-between">
+                  <div className="h-3.5 w-24 bg-dark-100 rounded-lg" />
+                  <div className="h-3.5 w-20 bg-dark-100 rounded-lg" />
+                </div>
+              ))}
+              <div className="border-t border-dark-100 pt-3 flex justify-between">
+                <div className="h-4 w-16 bg-dark-200 rounded-lg" />
+                <div className="h-4 w-24 bg-dark-200 rounded-lg" />
+              </div>
+            </div>
           </div>
         ) : error || !order ? (
           <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
@@ -435,11 +490,10 @@ export function OrderDetailPage() {
                   {proofs.map((proof, i) => {
                     const src = imageUrl(proof.imageUrl || proof.url);
                     return (
-                      <a
+                      <button
                         key={i}
-                        href={src}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        type="button"
+                        onClick={() => setLightbox({ images: proofs.map((p) => imageUrl(p.imageUrl || p.url)), index: i })}
                         className="aspect-square rounded-xl overflow-hidden border border-dark-200 bg-dark-50 block relative"
                       >
                         <div className="absolute inset-0 flex items-center justify-center text-dark-300">
@@ -451,7 +505,7 @@ export function OrderDetailPage() {
                           className="relative w-full h-full object-cover hover:scale-105 transition-transform"
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
-                      </a>
+                      </button>
                     );
                   })}
                 </div>
@@ -487,13 +541,14 @@ export function OrderDetailPage() {
                       <p className="text-xs font-medium text-blue-700 mb-2">Shipping Proof:</p>
                       <div className="grid grid-cols-3 gap-2">
                         {imgs.map((img, i) => (
-                          <a key={i} href={imageUrl(img)} target="_blank" rel="noopener noreferrer"
+                          <button key={i} type="button"
+                            onClick={() => setLightbox({ images: imgs.map((im) => imageUrl(im)), index: i })}
                             className="aspect-square rounded-xl overflow-hidden border border-blue-200 bg-blue-50 block relative">
                             <div className="absolute inset-0 flex items-center justify-center text-blue-200">
                               <ImageOff size={18} />
                             </div>
                             <img src={imageUrl(img)} alt={`Delivery ${i + 1}`} className="relative w-full h-full object-cover hover:scale-105 transition-transform" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                          </a>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -523,7 +578,7 @@ export function OrderDetailPage() {
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setRefundMethod(m)}
+                      onClick={() => { setRefundMethod(m); reset(); }}
                       className={clsx(
                         'flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors',
                         refundMethod === m
@@ -538,30 +593,71 @@ export function OrderDetailPage() {
                 <form onSubmit={handleSubmit((d) => { setPendingRefundData({ ...d, method: refundMethod }); setRefundDetailConfirmOpen(true); })} className="space-y-3">
                   {refundMethod === 'BANK' ? (
                     <>
-                      <div className="relative">
-                        <select {...register('bankName', { required: true })} className="w-full appearance-none pl-3 pr-8 py-2 border border-amber-300 rounded-xl text-sm bg-white cursor-pointer">
-                          <option value="">Select Bank</option>
-                          {['BCA', 'BNI', 'BRI', 'Mandiri', 'CIMB Niaga', 'BSI', 'Jenius/SMBC', 'Danamon', 'Permata'].map((b) => (
-                            <option key={b} value={b}>{b}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                      <div>
+                        <div className="relative">
+                          <select
+                            {...register('bankName', { required: 'Pilih bank tujuan' })}
+                            className={clsx('w-full appearance-none pl-3 pr-8 py-2 border rounded-xl text-sm bg-white cursor-pointer', errors.bankName ? 'border-red-400' : 'border-amber-300')}
+                          >
+                            <option value="">Pilih Bank</option>
+                            {['BCA', 'BNI', 'BRI', 'Mandiri', 'CIMB Niaga', 'BSI', 'Jenius/SMBC', 'Danamon', 'Permata'].map((b) => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                        </div>
+                        {errors.bankName && <p className="text-xs text-red-500 mt-1">{errors.bankName.message}</p>}
                       </div>
-                      <input {...register('accountNumber', { required: true })} placeholder="Account Number" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
-                      <input {...register('accountName', { required: true })} placeholder="Account Holder Name" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
+                      <div>
+                        <input
+                          {...register('accountNumber', { required: 'Nomor rekening wajib diisi' })}
+                          placeholder="Nomor Rekening"
+                          className={clsx('w-full px-3 py-2 border rounded-xl text-sm', errors.accountNumber ? 'border-red-400' : 'border-amber-300')}
+                        />
+                        {errors.accountNumber && <p className="text-xs text-red-500 mt-1">{errors.accountNumber.message}</p>}
+                      </div>
+                      <div>
+                        <input
+                          {...register('accountName', { required: 'Nama pemilik rekening wajib diisi' })}
+                          placeholder="Nama Pemilik Rekening"
+                          className={clsx('w-full px-3 py-2 border rounded-xl text-sm', errors.accountName ? 'border-red-400' : 'border-amber-300')}
+                        />
+                        {errors.accountName && <p className="text-xs text-red-500 mt-1">{errors.accountName.message}</p>}
+                      </div>
                     </>
                   ) : (
                     <>
-                      <div className="relative">
-                        <select {...register('ewalletPlatform', { required: true })} className="w-full appearance-none pl-3 pr-8 py-2 border border-amber-300 rounded-xl text-sm bg-white cursor-pointer">
-                          <option value="">Select E-Wallet</option>
-                          {['OVO', 'GoPay', 'DANA', 'ShopeePay', 'LinkAja'].map((e) => (
-                            <option key={e} value={e}>{e}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                      <div>
+                        <div className="relative">
+                          <select
+                            {...register('ewalletPlatform', { required: 'Pilih platform e-wallet' })}
+                            className={clsx('w-full appearance-none pl-3 pr-8 py-2 border rounded-xl text-sm bg-white cursor-pointer', errors.ewalletPlatform ? 'border-red-400' : 'border-amber-300')}
+                          >
+                            <option value="">Pilih E-Wallet</option>
+                            {['OVO', 'GoPay', 'DANA', 'ShopeePay', 'LinkAja'].map((e) => (
+                              <option key={e} value={e}>{e}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-500 pointer-events-none" />
+                        </div>
+                        {errors.ewalletPlatform && <p className="text-xs text-red-500 mt-1">{errors.ewalletPlatform.message}</p>}
                       </div>
-                      <input {...register('ewalletNumber', { required: true })} placeholder="E-Wallet Number" className="w-full px-3 py-2 border border-amber-300 rounded-xl text-sm" />
+                      <div>
+                        <input
+                          {...register('ewalletNumber', { required: 'Nomor e-wallet wajib diisi' })}
+                          placeholder="Nomor E-Wallet"
+                          className={clsx('w-full px-3 py-2 border rounded-xl text-sm', errors.ewalletNumber ? 'border-red-400' : 'border-amber-300')}
+                        />
+                        {errors.ewalletNumber && <p className="text-xs text-red-500 mt-1">{errors.ewalletNumber.message}</p>}
+                      </div>
+                      <div>
+                        <input
+                          {...register('ewalletName', { required: 'Nama pemilik e-wallet wajib diisi' })}
+                          placeholder="Nama Pemilik E-Wallet"
+                          className={clsx('w-full px-3 py-2 border rounded-xl text-sm', errors.ewalletName ? 'border-red-400' : 'border-amber-300')}
+                        />
+                        {errors.ewalletName && <p className="text-xs text-red-500 mt-1">{errors.ewalletName.message}</p>}
+                      </div>
                     </>
                   )}
                   <Button type="submit" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700" disabled={refundDetailMutation.isPending}>
@@ -571,11 +667,58 @@ export function OrderDetailPage() {
               </div>
             )}
 
-            {order.status === 'REFUND_REQUESTED' && order.refundDetail && (
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-                <p className="text-sm font-semibold text-green-700">Refund details submitted. Admin is processing the transfer.</p>
-              </div>
-            )}
+            {order.status === 'REFUND_REQUESTED' && order.refundDetail && (() => {
+              const rd = order.refundDetail;
+              const isBank = rd.method === 'BANK';
+              return (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-green-900">Refund Account Details</h2>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">Submitted</span>
+                  </div>
+                  <p className="text-xs text-green-700">Detail rekening sudah diterima. Admin sedang memproses transfer refund.</p>
+                  <div className="bg-white border border-green-200 rounded-xl divide-y divide-green-100">
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-xs text-dark-500">Metode</span>
+                      <span className="text-sm font-semibold text-dark-900">{isBank ? 'Bank Transfer' : 'E-Wallet'}</span>
+                    </div>
+                    {isBank ? (
+                      <>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-dark-500">Bank</span>
+                          <span className="text-sm font-semibold text-dark-900">{rd.bankName}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-dark-500">Nomor Rekening</span>
+                          <span className="text-sm font-semibold text-dark-900 font-mono">{rd.accountNumber}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-dark-500">Atas Nama</span>
+                          <span className="text-sm font-semibold text-dark-900">{rd.accountName}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-dark-500">Platform</span>
+                          <span className="text-sm font-semibold text-dark-900">{rd.ewalletPlatform}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-xs text-dark-500">Nomor</span>
+                          <span className="text-sm font-semibold text-dark-900 font-mono">{rd.ewalletNumber}</span>
+                        </div>
+                        {rd.ewalletName && (
+                          <div className="flex items-center justify-between px-4 py-2.5">
+                            <span className="text-xs text-dark-500">Atas Nama</span>
+                            <span className="text-sm font-semibold text-dark-900">{rd.ewalletName}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── DELIVERED: review per product ── */}
             {order.status === ORDER_STATUS.DELIVERED && items.length > 0 && (() => {
@@ -655,6 +798,8 @@ export function OrderDetailPage() {
           </Button>
         </div>
       </Modal>
+
+      {lightbox && <ImageLightbox images={lightbox.images} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
 
       <Footer />
     </div>

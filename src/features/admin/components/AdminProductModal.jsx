@@ -3,7 +3,8 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { PriceCalculator } from './PriceCalculator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, ImagePlus, X, Camera, Image, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, ImagePlus, X, Camera, Image, ChevronDown, Search, Loader2 } from 'lucide-react';
+import api from '../../../shared/services/api';
 import {
   getProductAdmin,
   createProduct,
@@ -12,7 +13,6 @@ import {
   getOrigins,
 } from '../../products/services/product.service';
 import { getAdminEvents } from '../../events/services/event.service';
-import api from '../../../shared/services/api';
 import Modal from '../../../shared/components/Modal';
 import Button from '../../../shared/components/Button';
 import Input from '../../../shared/components/Input';
@@ -151,6 +151,8 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
   const [images, setImages] = useState([]);
   const [hasVariants, setHasVariants] = useState(false);
   const [variantImages, setVariantImages] = useState([]);
+  const [lensLoading, setLensLoading] = useState(false);
+  const lensInputRef = useRef(null);
 
   // Variant image picker state
   const [openPickerIdx, setOpenPickerIdx] = useState(null);  // which variant picker is open
@@ -380,6 +382,29 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
       data.type === 'JASTIP' && data.eventId ? data.eventId : null;
 
     saveMutation.mutate(fd);
+  };
+
+  const handleLensSearch = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    // Open tab immediately inside user-gesture context — avoids popup blocker
+    const newTab = window.open('', '_blank');
+    setLensLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await api.post('/upload/temp', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = res.data?.data?.url;
+      if (!url) throw new Error('No URL returned');
+      newTab.location.href = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(url)}`;
+    } catch (err) {
+      newTab?.close();
+      console.error('Lens upload error:', err);
+      toast.error('Gagal upload foto. Coba lagi.');
+    } finally {
+      setLensLoading(false);
+    }
   };
 
   const onSubmitError = (errs) => {
@@ -688,7 +713,36 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
 
           {/* ── Tab 2: Media ── */}
           {activeTab === 2 && (
-            <MediaUpload files={images} onChange={setImages} />
+            <div className="space-y-4">
+              {/* Google Lens reverse image search */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Search size={13} className="text-blue-700 flex-shrink-0" />
+                  <p className="text-xs font-semibold text-blue-800">Cari produk serupa di Google Lens</p>
+                </div>
+                <p className="text-xs text-blue-600">Foto barangnya → sistem upload otomatis → Google Lens carikan gambar produk serupa di tab baru.</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => lensInputRef.current?.click()}
+                    disabled={lensLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg transition-colors"
+                  >
+                    {lensLoading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+                    {lensLoading ? 'Mengupload...' : 'Ambil / Pilih Foto'}
+                  </button>
+                </div>
+                <input
+                  ref={lensInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLensSearch}
+                />
+              </div>
+
+              <MediaUpload files={images} onChange={setImages} />
+            </div>
           )}
 
           {/* ── Tab 3: Event (JASTIP only) ── */}
