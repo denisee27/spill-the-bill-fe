@@ -152,6 +152,7 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
   const [hasVariants, setHasVariants] = useState(false);
   const [variantImages, setVariantImages] = useState([]);
   const [lensLoading, setLensLoading] = useState(false);
+  const [lensUrl, setLensUrl] = useState(null);
   const lensInputRef = useRef(null);
 
   // Variant image picker state
@@ -220,6 +221,7 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
       setVariantImages([]);
       setActiveTab(0);
       setOpenPickerIdx(null);
+      setLensUrl(null);
     }
   }, [isOpen, reset]);
 
@@ -388,18 +390,16 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    // Open tab immediately inside user-gesture context — avoids popup blocker
-    const newTab = window.open('', '_blank');
     setLensLoading(true);
+    setLensUrl(null);
     try {
       const fd = new FormData();
       fd.append('image', file);
       const res = await api.post('/upload/temp', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       const url = res.data?.data?.url;
       if (!url) throw new Error('No URL returned');
-      newTab.location.href = `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(url)}`;
+      setLensUrl(`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(url)}`);
     } catch (err) {
-      newTab?.close();
       console.error('Lens upload error:', err);
       toast.error('Gagal upload foto. Coba lagi.');
     } finally {
@@ -721,7 +721,7 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
                   <p className="text-xs font-semibold text-blue-800">Cari produk serupa di Google Lens</p>
                 </div>
                 <p className="text-xs text-blue-600">Foto barangnya → sistem upload otomatis → Google Lens carikan gambar produk serupa di tab baru.</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => lensInputRef.current?.click()}
@@ -731,6 +731,17 @@ export function AdminProductModal({ isOpen, onClose, productId, isDuplicate = fa
                     {lensLoading ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
                     {lensLoading ? 'Mengupload...' : 'Ambil / Pilih Foto'}
                   </button>
+                  {lensUrl && (
+                    <a
+                      href={lensUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    >
+                      <Search size={13} />
+                      Buka Google Lens →
+                    </a>
+                  )}
                 </div>
                 <input
                   ref={lensInputRef}

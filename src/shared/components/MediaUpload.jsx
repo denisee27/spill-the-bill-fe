@@ -183,9 +183,10 @@ export function MediaUpload({ files = [], onChange }) {
                       <button
                         type="button"
                         onClick={() => setLightboxIndex(imgIndexInGallery)}
-                        className="w-full h-full cursor-zoom-in"
+                        className="w-full h-full cursor-zoom-in relative"
                       >
                         <img src={getPreviewUrl(file)} className="w-full h-full object-cover" alt="" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-150" />
                       </button>
                     )}
 

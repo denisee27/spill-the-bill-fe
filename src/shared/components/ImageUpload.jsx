@@ -62,13 +62,14 @@ export function ImageUpload({ files = [], onChange, multiple = true, className =
               <button
                 type="button"
                 onClick={() => setLightboxIndex(index)}
-                className="w-full h-full cursor-zoom-in"
+                className="w-full h-full cursor-zoom-in relative"
               >
                 <img
                   src={src}
                   alt={`Preview ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition-colors duration-150" />
               </button>
               <button
                 type="button"
