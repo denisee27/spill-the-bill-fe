@@ -7,31 +7,34 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to VPC
+    name: Build & Deploy to VPS
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Build & Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy dist to VPS
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPC_HOST }}
           username: ${{ secrets.VPC_USER }}
           key: ${{ secrets.VPC_SSH_KEY }}
-          script: |
-            set -e
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-
-            cd /opt/spill-the-bill/frontend
-
-            echo "── Pull latest code ──"
-            git pull origin main
-
-            echo "── Install dependencies ──"
-            npm ci
-
-            echo "── Build ──"
-            npm run build
-
-            echo "── Done ✓ ──"
+          source: "dist/"
+          target: "/opt/spill-the-bill/frontend/"
+          rm: true
