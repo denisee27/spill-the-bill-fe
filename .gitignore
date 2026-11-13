@@ -11,6 +11,7 @@ docs/
 .env.local
 .env.*.local
 .env.production
+.env.staging
 
 # Vite cache
 .vite/
