@@ -29,12 +29,15 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPC_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPC_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy dist to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPC_HOST }}
-          username: ${{ secrets.VPC_USER }}
-          key: ${{ secrets.VPC_SSH_KEY }}
-          source: "dist/"
-          target: "/opt/spill-the-bill/frontend/"
-          rm: true
+        run: |
+          rsync -az --delete dist/ ${{ secrets.VPC_USER }}@${{ secrets.VPC_HOST }}:/opt/spill-the-bill/frontend/
+        env:
+          RSYNC_RSH: "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
